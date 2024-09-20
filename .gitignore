@@ -34,4 +34,4 @@
 Eigen
 eigen-3.4.0
 pastix
-.txt
+*.txt
