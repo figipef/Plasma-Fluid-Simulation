@@ -42,15 +42,16 @@ int main() {
     std::map<int, double> sig_map;
 
     double fronteira[] = {0,0,1,0};
-    double fronteira_livre[] = {0,0,1,0}; // zmin, zmax, r0, rmax
+    double fronteira_livre[] = {0,0,1,1}; // zmin, zmax, r0, rmax
 
     sig_map[0] = 0;
 
-    eps_map[0] = no_epsi;
-    eps_map[66] = no_epsi*2;
-    eps_map[132] = no_epsi*10;
+    //eps_map[0] = no_epsi;
+    //eps_map[66] = no_epsi*2;
+    //eps_map[132] = no_epsi*10;
 
-    std::vector<std::pair<int, double>> eps_vec = {{0, 1.0}, {66, 2.0}, {132, 10.0}};
+    std::vector<std::pair<int, double>> eps_vec = {{0, epsi}};//, {66, 2.0}, {132, 10.0}};
+    std::vector<std::pair<int, double>> sig_vec = {{49,8e-5}};
 
     Poisson1DCart testPoisson1D(12, 1, 0.);
 
@@ -62,9 +63,9 @@ int main() {
 
     //testPoisson1D.dirichlet(5, true, true, 0, 10, &constant);
 
-    Poisson2DCyl testPoisson2D(200,200,0.01,0.01,eps_vec, sig_map);
+    Poisson2DCyl testPoisson2D(100,100,0.0001,0.0001,eps_vec, sig_vec);
 
-    testPoisson2D.solve(10,0,0,0, &ZERO2D, fronteira_livre, "zero");
+    testPoisson2D.solve(0,0,0,0, &ZERO2D, fronteira_livre, "zero");
 
 
     return 0;

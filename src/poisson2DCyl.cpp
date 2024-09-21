@@ -12,7 +12,7 @@
 #include <string>
 #include <chrono>
 
-Poisson2DCyl::Poisson2DCyl(int n, int m, double dr, double dz, std::vector<std::pair<int, double>> eps, std::map<int, double> sig) {
+Poisson2DCyl::Poisson2DCyl(int n, int m, double dr, double dz, std::vector<std::pair<int, double>> eps, std::vector<std::pair<int, double>> sig) {
 
 	r_size = n;
 	z_size = m;
@@ -32,7 +32,7 @@ Poisson2DCyl::Poisson2DCyl(int n, int m, double dr, double dz, std::vector<std::
 	phis = new double*[n];
 
 	eps_vec = eps;
-	sig_map = sig;
+	sig_vec = sig;
 
 	for (int i = 0; i < n; ++i) {
 
@@ -140,7 +140,38 @@ void Poisson2DCyl::solve(double V0, double VMAX, double VWALL, double VIN ,doubl
 
 		for (int j = 0; j < z_size; j++){
 
-			RHS(i,j) = func(r_grid[i], z_grid[j]) * dr2 * M_PI * z_step;
+			double epsj = 0;// eps_map[(--eps_map.lower_bound(j)) -> first];
+			double epsj1 = 0;//eps_map[(--eps_map.lower_bound(j+1)) -> first];
+
+			auto it = std::upper_bound(eps_vec.begin(), eps_vec.end(), std::make_pair(j, 0.0), [](const auto& a, const auto& b) { return a.first < b.first; });
+		    // Check if the iterator is valid and decrement it to get the value
+		    
+		    if (it != eps_vec.begin()) {
+		        --it;  // Move to the largest key less than or equal to j
+		        epsj = it->second;
+		    }
+
+		    auto it1 = std::upper_bound(eps_vec.begin(), eps_vec.end(), std::make_pair(j+1, 0.0), [](const auto& a, const auto& b) { return a.first < b.first; });
+
+		    if (it1 != eps_vec.begin()) {
+		        --it1;  // Move to the largest key less than or equal to j
+		        epsj1 = it1->second;
+		    }
+
+			RHS(i,j) = RHS(i,j) + func(r_grid[i], z_grid[j]) * dr2 * M_PI * z_step;
+
+			bool found = false;
+
+		    for (const auto& pair : sig_vec) {
+
+		        if (pair.first == j) {
+		        	
+		            RHS(i,j) = RHS(i,j) + (epsj * pair.second *hdz * M_PI*dr2)/((epsj + epsj1)*hdz);
+		            RHS(i,j+1) = RHS(i,j+1) + (epsj1 * pair.second *hdz * M_PI*dr2)/((epsj + epsj1)*hdz);
+		            found = true;
+		            break;  // Exit loop if we found a match
+		        }
+		    }
 
 			if (i == 0){
 				if (fronteira[2]){
@@ -347,8 +378,22 @@ void Poisson2DCyl::solve(double V0, double VMAX, double VWALL, double VIN ,doubl
 		        epsj2 = it1->second;
 		    }
 
-			E1_z(i,j) = (epsj2*V(i,j) - epsj2*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
-			E2_z(i,j) = (epsj1*V(i,j) - epsj1*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
+		    bool found = false;
+
+		    for (const auto& pair : sig_vec) {
+		        if (pair.first == j) {
+		        	E1_z(i,j) = (- pair.second * hdz + epsj2*V(i,j) - epsj2*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
+					E2_z(i,j) = ( pair.second * hdz + epsj1*V(i,j) - epsj1*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
+		            found = true;
+		            break;  // Exit loop if we found a match
+		        }
+		    }
+
+		    if (!found){
+		    	E1_z(i,j) = (epsj2*V(i,j) - epsj2*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
+				E2_z(i,j) = (epsj1*V(i,j) - epsj1*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
+		    }
+
 			
 		}
 	}

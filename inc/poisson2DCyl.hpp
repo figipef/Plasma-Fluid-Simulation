@@ -18,7 +18,7 @@ class Poisson2DCyl{
 
 
 		std::vector<std::pair<int, double>> eps_vec; // Dieletric constant across along z
-		std::map<int, double> sig_map; // Surface charge densety along z
+		std::vector<std::pair<int, double>> sig_vec; // Surface charge densety along z
 
 		double **v;	
 		
@@ -30,7 +30,7 @@ class Poisson2DCyl{
 		double **phin;
 		double **phis;
 
-		Poisson2DCyl(int, int, double, double, std::vector<std::pair<int, double>>, std::map<int, double>); // n, m, rstep, zstep eps, sig
+		Poisson2DCyl(int, int, double, double, std::vector<std::pair<int, double>>, std::vector<std::pair<int, double>>); // n, m, rstep, zstep eps, sig
 
 		void solve(double, double, double, double ,double (*)(double, double), double[4], std::string);
 
