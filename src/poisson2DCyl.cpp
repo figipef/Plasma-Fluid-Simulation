@@ -34,6 +34,11 @@ Poisson2DCyl::Poisson2DCyl(int n, int m, double dr, double dz, std::vector<std::
 	eps_vec = eps;
 	sig_vec = sig;
 
+	S_hori = Eigen::MatrixXd::Zero(r_size, z_size);
+	S_vert = Eigen::MatrixXd::Zero(r_size, z_size);
+	vols = Eigen::MatrixXd::Zero(r_size, z_size);
+	rho = Eigen::MatrixXd::Zero(r_size, z_size);
+
 	for (int i = 0; i < n; ++i) {
 
         phic[i] = new double[m];
@@ -57,6 +62,12 @@ Poisson2DCyl::Poisson2DCyl(int n, int m, double dr, double dz, std::vector<std::
 		double dr2 = ((r_grid[i] + hdr) * (r_grid[i] + hdr) - (r_grid[i] - hdr) * (r_grid[i] - hdr));
 
 		for (int j = 0; j < m; j++){
+
+			// Calcular volumes e superficies (superiores/N e á direita/E) de celulas i,j
+
+			S_hori(i,j) = M_PI * dr2;
+			S_vert(i,j) = 2 * M_PI * (r_grid[i] + hdr) * dz;
+			vols(i,j) = M_PI * dr2 * dz;
 
 			phin[i][j] = 0;
 			phis[i][j] = 0;
@@ -83,11 +94,11 @@ Poisson2DCyl::Poisson2DCyl(int n, int m, double dr, double dz, std::vector<std::
 		    }
 
 			if (j < m){
-				phie[i][j] =  -M_PI * dr2 * epsj * epsj1 / ((epsj1 + epsj) * hdz);
+				phie[i][j] =  -S_hori(i,j) * epsj * epsj1 / ((epsj1 + epsj) * hdz);
 			}
 
 			if (i < n){
-				phin[i][j] = -2 * M_PI * (r_grid[i] + hdr) * dz * epsj / dr;
+				phin[i][j] = -S_vert(i,j) * epsj / dr;
 			}
 
 			if (i > 0){
@@ -134,7 +145,7 @@ void Poisson2DCyl::solve(double V0, double VMAX, double VWALL, double VIN ,doubl
 
 	for (int i = 0; i < r_size; i++){
 
-		double dr2 = ((r_grid[i] + hdr) * (r_grid[i] + hdr) - (r_grid[i] - hdr) * (r_grid[i] - hdr));
+		//double dr2 = ((r_grid[i] + hdr) * (r_grid[i] + hdr) - (r_grid[i] - hdr) * (r_grid[i] - hdr)); // ativar caso voltare a usar para calculo de rhos
 
 		//std::cout<<r_grid[i] + hdr<<"  "<<r_grid[i] - hdr <<"  "<<dr2<<std::endl;
 
@@ -158,7 +169,7 @@ void Poisson2DCyl::solve(double V0, double VMAX, double VWALL, double VIN ,doubl
 		        epsj1 = it1->second;
 		    }
 
-			RHS(i,j) = RHS(i,j) + func(r_grid[i], z_grid[j]) * dr2 * M_PI * z_step;
+			RHS(i,j) = RHS(i,j) + func(r_grid[i], z_grid[j]) * vols(i,j); // Alterado o RHS pela matrize de volume por verificar !!
 
 			bool found = false;
 
@@ -166,8 +177,8 @@ void Poisson2DCyl::solve(double V0, double VMAX, double VWALL, double VIN ,doubl
 
 		        if (pair.first == j) {
 		        	
-		            RHS(i,j) = RHS(i,j) + (epsj * pair.second *hdz * M_PI*dr2)/((epsj + epsj1)*hdz);
-		            RHS(i,j+1) = RHS(i,j+1) + (epsj1 * pair.second *hdz * M_PI*dr2)/((epsj + epsj1)*hdz);
+		            RHS(i,j) = RHS(i,j) + (epsj * pair.second * S_hori(i,j))/(epsj + epsj1); // Alterado o RHS pela matrize de superficie por verificar !!
+		            RHS(i,j+1) = RHS(i,j+1) + (epsj1 * pair.second * S_hori(i,j))/(epsj + epsj1); // Alterado o RHS pela matrize de superficie por verificar !!
 		            found = true;
 		            break;  // Exit loop if we found a match
 		        }
@@ -398,6 +409,10 @@ void Poisson2DCyl::solve(double V0, double VMAX, double VWALL, double VIN ,doubl
 		}
 	}
 
+	Er = E_r;
+	Ez1 = E1_z;
+	Ez2 = E2_z;
+
 	std::ofstream fileEr("../Er.txt");
 
     if (fileEr.is_open()) {
@@ -435,5 +450,72 @@ void Poisson2DCyl::solve(double V0, double VMAX, double VWALL, double VIN ,doubl
     } else {
         std::cerr << "Unable to open file\n";
     }
+};
+
+void Poisson2DCyl::push_time(double dt){
+
+	double mu = 1; // To be changed later !!!
+	double De = 1;
+
+	// double ne_N_flux; // Used to minimize calculations of fluxes | To be implemented has to be with a vector to save it and reuse them !!
+	double ne_E_flux; // Used to minimize calculations of fluxes
+
+	Eigen::MatrixXd Se(r_size, z_size); // Source term TO BE CHANGED
+
+	// Calculate Fluxes at each cell
+	
+	double f_W;
+	double f_E;
+	double f_N;
+	double f_S;
+
+	for (int i = 0; i < r_size; i++){
+
+		for (int j = 0; j < z_size; ++j){
+			
+			if (i == 0){
+
+				f_S = 0;
+
+			} else {
+
+				f_S = (-ne(i,j) * mu * Er(i - 1,j) - De * (ne(i,j) - ne(i - 1, j)) / r_step) * S_vert(i - 1,j);
+			}
+
+			if (i == r_size - 1){
+
+				f_N = 0;
+
+			} else {
+
+				f_N = (-ne(i,j) * mu * Er(i,j) - De * (ne(i + 1,j) - ne(i, j)) / r_step) * S_vert(i,j); 
+			}
+
+			if (j == 0){
+
+				f_W = 0;
+
+			} else {
+
+				f_W = (-ne(i,j) * mu * Ez2(i,j - 1) - De * ne_E_flux) * S_hori(i,j - 1); // CHECK EZ2 !!
+			}
+
+			ne_E_flux = (ne(i,j + 1) - ne(i, j)) / z_step;
+
+			if (j == z_size - 1){
+			
+				f_E = 0;
+			
+			} else {
+			
+				f_E = (-ne(i,j) * mu * Ez1(i,j) - De * ne_E_flux) * S_hori(i,j); // CHECK EZ1 !!
+			}
+
+			// Calculate de change in electron density
+
+			ne(i,j) = ne(i,j) + dt * (Se(i,j) + (f_W - f_E + f_S - f_N)/vols(i,j));
+			
+		}
+	} 	
 
 };
