@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import math
 
 #data = np.loadtxt('jan.txt')
@@ -157,4 +158,42 @@ plt.gca().invert_yaxis()
 #plt.title(r'Ez difference')
 #plt.gca().invert_yaxis()
 
+plt.show()
+
+
+def load_all_matrices(filename):
+    matrices = []
+    times = []
+    with open(filename, 'r') as f:
+        matrix_data = []
+        for line in f:
+            if line.startswith("Time:"):
+                times.append(float(line.split()[1]))
+                if matrix_data:
+                    matrices.append(np.array(matrix_data))
+                    matrix_data = []
+            elif line.strip() == "----":
+                continue
+            else:
+                row = [float(val) for val in line.split()]
+                matrix_data.append(row)
+        if matrix_data:  # Add the last matrixb
+            matrices.append(np.array(matrix_data))
+    return times, matrices
+
+# Load the data
+times, matrices = load_all_matrices("build/rho_data.txt")
+
+# Set up the figure and axis
+fig, ax = plt.subplots()
+im = ax.imshow(matrices[0], cmap='viridis', vmin=0, vmax=1)  # Adjust vmin/vmax as needed
+
+def update(frame):
+    im.set_array(matrices[frame])
+    ax.set_title(f'Time = {times[frame]}')
+    return [im]
+
+# Create an animation
+ani = animation.FuncAnimation(fig, update, frames=len(matrices), blit=True)
+plt.colorbar(im)
 plt.show()
