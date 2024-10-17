@@ -121,6 +121,8 @@ Poisson2DCyl::Poisson2DCyl(int n, int m, double dr, double dz, std::vector<std::
 
 		}	
 	}
+	std::cout<<S_vert<<std::endl;
+	std::cout<<S_hori<<std::endl;
 	/*
     std::cout<< "grid r" <<std::endl;
 
@@ -283,7 +285,7 @@ void Poisson2DCyl::solve(double V0, double VMAX, double VWALL, double VIN ,doubl
 
 	if (z_size < 15 && r_size <= 7){
 
-		std::cout << "Sparse Matrix:\n" << Eigen::MatrixXd(PHI) << std::endl;
+		//std::cout << "Sparse Matrix:\n" << Eigen::MatrixXd(PHI) << std::endl;
 	}
 	Eigen::VectorXd b(RHS.size());
 
@@ -291,7 +293,7 @@ void Poisson2DCyl::solve(double V0, double VMAX, double VWALL, double VIN ,doubl
 
     if (z_size < 15 && r_size <= 7){
 
-		std::cout << "Sparse Matrix column:\n" << b << std::endl;
+		//std::cout << "Sparse Matrix column:\n" << b << std::endl;
 	}
 
     //Eigen::SparseLU<Eigen::SparseMatrix<double>> solver; // no memory for 1000x1000
@@ -573,7 +575,7 @@ void Poisson2DCyl::solve(double V0, double VMAX, double VWALL, double VIN ,Eigen
     std::cout << "Time taken to Load RHS: " << d1.count() << " ms" << std::endl;
 
 	if (z_size < 15 && r_size <= 7){
-		std::cout << "DENSE Matrix:\n" << RHS << std::endl;
+		//std::cout << "DENSE Matrix:\n" << RHS << std::endl;
 	}
 
 	//std::cout << "DENSE Matrix:\n" << RHS << std::endl;
@@ -613,6 +615,10 @@ void Poisson2DCyl::solve(double V0, double VMAX, double VWALL, double VIN ,Eigen
 
 	phi = PHI;
 
+	solver.analyzePattern(PHI);
+
+    solver.factorize(PHI);
+
 	auto t2 = std::chrono::high_resolution_clock::now();
 
 	std::chrono::duration<double, std::milli> d2 = t2 - t1;
@@ -625,177 +631,15 @@ void Poisson2DCyl::solve(double V0, double VMAX, double VWALL, double VIN ,Eigen
 
 		std::cout << "Sparse Matrix:\n" << Eigen::MatrixXd(PHI) << std::endl;
 	}
-	Eigen::VectorXd b(RHS.size());
 
-    b = Eigen::Map<const Eigen::VectorXd>(RHS.data(), RHS.size());
+	//Eigen::VectorXd b(RHS.size());
 
-    if (z_size < 15 && r_size <= 7){
+    //b = Eigen::Map<const Eigen::VectorXd>(RHS.data(), RHS.size());
 
-		std::cout << "Sparse Matrix column:\n" << b << std::endl;
-	}
+    //if (z_size < 15 && r_size <= 7){
 
-    //Eigen::SparseLU<Eigen::SparseMatrix<double>> solver; // no memory for 1000x1000
-    //Eigen::SimplicialLLT<Eigen::SparseMatrix<double>> solver; //VERY FAST !!
-    //Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver; // ALSO FAST (faster? 500ms for 1000x1000)
-
-    //Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower|Eigen::Upper> solver; // Very Slow
-
-    solver.analyzePattern(phi);
-
-    solver.factorize(phi);
-
-    //solver.compute(PHI);
-    //solved = solver;
-
-    /*
-    auto t3 = std::chrono::high_resolution_clock::now();
-
-	std::chrono::duration<double, std::milli> d3 = t3 - t2;
-    
-    std::cout << "Time taken to compute PHI (coeffecients): " << d3.count() << " ms" << std::endl;
-
-    Eigen::VectorXd v = solver.solve(b);
-
-    if (z_size < 15 && r_size <= 7){
-
-		std::cout << "Sparse Matrix column:\n" << v << std::endl;
-	}
-
-	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> V = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(v.data(), r_size, z_size);
-
-    auto end = std::chrono::high_resolution_clock::now();
-    
-    // Calculate the duration in milliseconds
-
-    std::chrono::duration<double, std::milli> d4 = end - t3;
-
-    std::chrono::duration<double, std::milli> duration = end - start;
-    
-    std::cout << "Time taken to solve: " << d4.count() << " ms" << std::endl;
-
-    std::cout << "Time taken: " << duration.count() << " ms" << std::endl;
-	*/
-    /*
-    std::ofstream file("../" + str + ".txt");
-
-    if (file.is_open()) {
-        // Write the matrix to the file
-        for (int i = 0; i < V.rows(); ++i) {
-            for (int j = 0; j < V.cols(); ++j) {
-                file << V(i, j);
-                if (j != V.cols() - 1) {
-                    file << " ";  // Space-separated values
-                }
-            }
-            file << "\n";  // Newline after each row
-        }
-        file.close();
-        std::cout << "Matrix written to " + str + ".txt\n";
-    } else {
-        std::cerr << "Unable to open file\n";
-    }
-
-
-    // Calculo de Campo Elétrico
-
-    Eigen::MatrixXd E_r(r_size-1, z_size);
-    Eigen::MatrixXd E1_z(r_size, z_size - 1);
-    Eigen::MatrixXd E2_z(r_size, z_size - 1);
-
-    for (int i = 0; i < r_size - 1; i++) { // Calculate the radial field (same dieletric constant)
-		
-		for (int j = 0; j <  z_size; j++){
-
-			E_r(i,j) = (V(i,j) - V(i+1,j)) / (r_step);
-
-		}		
-	} 
-
-	for (int i = 0; i < r_size; i++) {
-		
-		for (int j = 0; j <  z_size - 1; j++){
-
-			double epsj1 = 0;// eps_map[(--eps_map.lower_bound(j)) -> first];
-			double epsj2 = 0;//eps_map[(--eps_map.lower_bound(j+1)) -> first];
-
-			auto it = std::upper_bound(eps_vec.begin(), eps_vec.end(), std::make_pair(j, 0.0), [](const auto& a, const auto& b) { return a.first < b.first; });
-		    // Check if the iterator is valid and decrement it to get the value
-		    
-		    if (it != eps_vec.begin()) {
-		        --it;  // Move to the largest key less than or equal to j
-		        epsj1 = it->second;
-		    }
-
-		    auto it1 = std::upper_bound(eps_vec.begin(), eps_vec.end(), std::make_pair(j+1, 0.0), [](const auto& a, const auto& b) { return a.first < b.first; });
-
-		    if (it1 != eps_vec.begin()) {
-		        --it1;  // Move to the largest key less than or equal to j
-		        epsj2 = it1->second;
-		    }
-
-		    bool found = false;
-
-		    for (const auto& pair : sig_vec) {
-		        if (pair.first == j) {
-		        	E1_z(i,j) = (- pair.second * hdz + epsj2*V(i,j) - epsj2*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
-					E2_z(i,j) = ( pair.second * hdz + epsj1*V(i,j) - epsj1*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
-		            found = true;
-		            break;  // Exit loop if we found a match
-		        }
-		    }
-
-		    if (!found){
-		    	E1_z(i,j) = (epsj2*V(i,j) - epsj2*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
-				E2_z(i,j) = (epsj1*V(i,j) - epsj1*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
-		    }
-
-			
-		}
-	}
-
-	Er = E_r;
-	Ez1 = E1_z;
-	Ez2 = E2_z;
-
-	std::ofstream fileEr("../Er.txt");
-
-    if (fileEr.is_open()) {
-        // Write the matrix to the file
-        for (int i = 0; i < E_r.rows(); ++i) {
-            for (int j = 0; j < E_r.cols(); ++j) {
-                fileEr << E_r(i, j);
-                if (j != E_r.cols() - 1) {
-                    fileEr << " ";  // Space-separated values
-                }
-            }
-            fileEr << "\n";  // Newline after each row
-        }
-        fileEr.close();
-        std::cout << "Matrix written to Er.txt\n";
-    } else {
-        std::cerr << "Unable to open file\n";
-    }
-
-    std::ofstream fileE1z("../E1z.txt");
-
-    if (fileE1z.is_open()) {
-        // Write the matrix to the file
-        for (int i = 0; i < E1_z.rows(); ++i) {
-            for (int j = 0; j < E1_z.cols(); ++j) {
-                fileE1z << E1_z(i, j);
-                if (j != E1_z.cols() - 1) {
-                    fileE1z << " ";  // Space-separated values
-                }
-            }
-            fileE1z << "\n";  // Newline after each row
-        }
-        fileE1z.close();
-        std::cout << "Matrix written to E1_z.txt\n";
-    } else {
-        std::cerr << "Unable to open file\n";
-    }
-    */
-    std::cout<<"finished Poisson"<<std::endl;
+	//	std::cout << "Sparse Matrix column:\n" << b << std::endl;
+	//}	
 };
 
 void Poisson2DCyl::solve_Poisson(){
@@ -804,7 +648,7 @@ void Poisson2DCyl::solve_Poisson(){
 
 	for (int i = 0; i < r_size; i++){
 		for (int j = 0; j < z_size; j++){
-			RHS(i,j) = rhs_i(i,j) + rho(i,j) * vols(i,j) * 1.6e-19; // Alterado o RHS pela matrize de volume por verificar !!
+			RHS(i,j) = rhs_i(i,j) + rho(i,j) * vols(i,j); // Alterado o RHS pela matrize de volume por verificar !!
 		}
 	}
 
@@ -817,6 +661,7 @@ void Poisson2DCyl::solve_Poisson(){
 
     //std::cout<<V<<std::endl;
 
+    /*
 	std::ofstream file("../" + name + ".txt");
 
     if (file.is_open()) {
@@ -835,7 +680,7 @@ void Poisson2DCyl::solve_Poisson(){
     } else {
         std::cerr << "Unable to open file\n";
     }
-
+	*/
 
     // Calculo de Campo Elétrico
 
@@ -853,6 +698,8 @@ void Poisson2DCyl::solve_Poisson(){
 	} 
 
 	double hdz = z_step/2;
+
+	// REFAZER PARA UM VETOR COM SIGMA E EPSILONS DIFERENTES E JUNTAR O CALCULO DO E_R PARA O MESMO SITIO
 
 	for (int i = 0; i < r_size; i++) {
 		
@@ -896,56 +743,18 @@ void Poisson2DCyl::solve_Poisson(){
 		}
 	}
 
+	Pot = V;
 	Er = E_r;
 	Ez1 = E1_z;
 	Ez2 = E2_z;
 
-	std::ofstream fileEr("../Er.txt");
-
-    if (fileEr.is_open()) {
-        // Write the matrix to the file
-        for (int i = 0; i < E_r.rows(); ++i) {
-            for (int j = 0; j < E_r.cols(); ++j) {
-                fileEr << E_r(i, j);
-                if (j != E_r.cols() - 1) {
-                    fileEr << " ";  // Space-separated values
-                }
-            }
-            fileEr << "\n";  // Newline after each row
-        }
-        fileEr.close();
-        std::cout << "Matrix written to Er.txt\n";
-    } else {
-        std::cerr << "Unable to open file\n";
-    }
-
-    std::ofstream fileE1z("../E1z.txt");
-
-    if (fileE1z.is_open()) {
-        // Write the matrix to the file
-        for (int i = 0; i < E1_z.rows(); ++i) {
-            for (int j = 0; j < E1_z.cols(); ++j) {
-                fileE1z << E1_z(i, j);
-                if (j != E1_z.cols() - 1) {
-                    fileE1z << " ";  // Space-separated values
-                }
-            }
-            fileE1z << "\n";  // Newline after each row
-        }
-        fileE1z.close();
-        std::cout << "Matrix written to E1_z.txt\n";
-    } else {
-        std::cerr << "Unable to open file\n";
-    }
-
-    std::cout<<"finished Poisson"<<std::endl;
+	std::cout<<"finished Poisson"<<std::endl;
 };
-
 
 void Poisson2DCyl::push_time(double ti, double dt, std::ofstream& file){
 
-	double mu = 10; // To be changed later !!!
-	double De = 10;
+	double mu = 0.001; // To be changed later !!!
+	double De = 0.1;
 
 	// double ne_N_flux; // Used to minimize calculations of fluxes | To be implemented has to be with a vector to save it and reuse them !!
 	double ne_E_flux; // Used to minimize calculations of fluxes
@@ -963,7 +772,7 @@ void Poisson2DCyl::push_time(double ti, double dt, std::ofstream& file){
 
 	for (int i = 0; i < r_size; i++){
 
-		for (int j = 0; j < z_size; ++j){
+		for (int j = 0; j < z_size; ++j){ // ter atencao n(i,j) * mu
 
 			if (i == 0){
 
@@ -971,7 +780,7 @@ void Poisson2DCyl::push_time(double ti, double dt, std::ofstream& file){
 
 			} else {
 
-				f_S = (-ne(i,j) * mu * Er(i - 1,j) - De * (ne(i,j) - ne(i - 1, j)) / r_step) * S_vert(i - 1,j);
+				f_S = (-ne(i-1,j) * mu * Er(i - 1,j) - De * (ne(i,j) - ne(i - 1, j)) / r_step) * S_vert(i - 1,j);
 			}
 
 			if (i == r_size - 1){
@@ -989,7 +798,7 @@ void Poisson2DCyl::push_time(double ti, double dt, std::ofstream& file){
 
 			} else {
 
-				f_W = (-ne(i,j) * mu * Ez2(i,j - 1) - De * ne_E_flux) * S_hori(i,j - 1); // CHECK EZ2 !!
+				f_W = (-ne(i,j-1) * mu * Ez2(i,j - 1) - De * ne_E_flux) * S_hori(i,j - 1); // CHECK EZ2 !!
 			}
 
 			if (j < z_size -1){
@@ -1007,9 +816,12 @@ void Poisson2DCyl::push_time(double ti, double dt, std::ofstream& file){
 
 			// Calculate de change in electron density
 
-			
+			//std::cout<<f_W<<std::endl;
+			//std::cout<<f_E<<std::endl;
+			//std::cout<<f_S<<std::endl;
+			//std::cout<<f_N<<std::endl;
 
-			ne(i,j) = ne(i,j) + dt * (Se(i,j) + (f_W - f_E + f_S - f_N)/vols(i,j));
+			ne(i,j) = ne(i,j) + dt * (Se(i,j) +(f_W - f_E + f_S - f_N)/vols(i,j));//+(f_W - f_E + f_S - f_N)/vols(i,j));
 			
 		}
 	}
@@ -1020,6 +832,7 @@ void Poisson2DCyl::push_time(double ti, double dt, std::ofstream& file){
 	solve_Poisson();
 
 	std::cout<<"Pushed time to "<<ti + dt<<std::endl;
+	//std::cout<<ne<<std::endl;
 
 	file << "Time: " << ti+dt << "\n";
     file << rho << "\n";
@@ -1027,5 +840,65 @@ void Poisson2DCyl::push_time(double ti, double dt, std::ofstream& file){
 };
 
 void Poisson2DCyl::calculate_charge_density(){
-	rho = ni - ne;
+	rho = (ni - ne)* 1.6e-19;
+};
+
+void Poisson2DCyl::write_fields(){
+	
+	std::ofstream file("../V.txt");
+
+    if (file.is_open()) {
+        // Write the matrix to the file
+        for (int i = 0; i < Pot.rows(); ++i) {
+            for (int j = 0; j < Pot.cols(); ++j) {
+                file << Pot(i, j);
+                if (j != Pot.cols() - 1) {
+                    file << " ";  // Space-separated values
+                }
+            }
+            file << "\n";  // Newline after each row
+        }
+        file.close();
+        std::cout << "Matrix written to " + name + ".txt\n";
+    } else {
+        std::cerr << "Unable to open file\n";
+    }
+
+	std::ofstream fileEr("../Er.txt");
+
+    if (fileEr.is_open()) {
+        // Write the matrix to the file
+        for (int i = 0; i < Er.rows(); ++i) {
+            for (int j = 0; j < Er.cols(); ++j) {
+                fileEr << Er(i, j);
+                if (j != Er.cols() - 1) {
+                    fileEr << " ";  // Space-separated values
+                }
+            }
+            fileEr << "\n";  // Newline after each row
+        }
+        fileEr.close();
+        std::cout << "Matrix written to Er.txt\n";
+    } else {
+        std::cerr << "Unable to open file\n";
+    }
+
+    std::ofstream fileE1z("../Ez1.txt");
+
+    if (fileE1z.is_open()) {
+        // Write the matrix to the file
+        for (int i = 0; i < Ez1.rows(); ++i) {
+            for (int j = 0; j < Ez1.cols(); ++j) {
+                fileE1z << Ez1(i, j);
+                if (j != Ez1.cols() - 1) {
+                    fileE1z << " ";  // Space-separated values
+                }
+            }
+            fileE1z << "\n";  // Newline after each row
+        }
+        fileE1z.close();
+        std::cout << "Matrix written to Ez1.txt\n";
+    } else {
+        std::cerr << "Unable to open file\n";
+    }
 };

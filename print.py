@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import math
+from matplotlib.colors import SymLogNorm
 
 #data = np.loadtxt('jan.txt')
 data = np.loadtxt('zero.txt')
@@ -186,7 +187,7 @@ times, matrices = load_all_matrices("build/rho_data.txt")
 
 # Set up the figure and axis
 fig, ax = plt.subplots()
-im = ax.imshow(matrices[0], cmap='viridis', vmin=0, vmax=1)  # Adjust vmin/vmax as needed
+im = ax.imshow(matrices[0], cmap='viridis')#,norm=SymLogNorm(linthresh=1))  # Adjust vmin/vmax as needed
 
 def update(frame):
     im.set_array(matrices[frame])

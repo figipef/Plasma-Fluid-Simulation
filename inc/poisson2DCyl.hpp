@@ -48,6 +48,8 @@ class Poisson2DCyl{
 		Eigen::SparseMatrix<double> phi;
 		Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
 
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Pot;
+
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Er;
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Ez1;
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Ez2;
@@ -68,4 +70,5 @@ class Poisson2DCyl{
 
 		void calculate_charge_density();
 
+		void write_fields();
 };

@@ -43,17 +43,17 @@ double jan(double r, double z){
 
 int main() {
 
-    int size_r = 100;
-    int size_z = 100;
+    int size_r = 50;
+    int size_z = 50;
 
     std::map<int, double> eps_map;
     std::map<int, double> sig_map;
 
     Eigen::MatrixXd ne = Eigen::MatrixXd::Constant(size_r, size_z, 1e21);
-    Eigen::MatrixXd ni = Eigen::MatrixXd::Constant(size_r, size_z, 1e21);
+    Eigen::MatrixXd ni = Eigen::MatrixXd::Constant(size_r, size_z, 0);
 
     double fronteira[] = {0,0,1,0};
-    double fronteira_livre[] = {0,0,1,0}; // zmin, zmax, r0, rmax
+    double fronteira_livre[] = {0,0,1,1}; // zmin, zmax, r0, rmax
 
     sig_map[0] = 0;
 
@@ -75,11 +75,11 @@ int main() {
 
     //testPoisson1D.dirichlet(5, true, true, 0, 10, &constant);
 
-    Poisson2DCyl testPoisson2D(size_r,size_z,0.0001,0.0001,eps_vec, sig_vec);
+    Poisson2DCyl testPoisson2D(size_r,size_z,0.001,0.001,eps_vec, sig_vec);
 
     //testPoisson2D.solve(0,0,0,0, &ZERO2D, fronteira_livre, "zero");
 
-    testPoisson2D.solve(10,0,0,0, ne,ni, fronteira_livre, "zero");
+    testPoisson2D.solve(10e4,0,0,0, ne,ni, fronteira_livre, "zero");
     //testPoisson2D.solve(10,0,0,0, ne,ni, fronteira_livre, "zero");
     testPoisson2D.solve_Poisson();
     //testPoisson2D.solve_Poisson();    
@@ -91,8 +91,8 @@ int main() {
         std::cerr << "Error opening file!\n";
         return 1;
     }
-    for (double time = 0.0; time <=100 ; time += 1.0) {
-        testPoisson2D.push_time(time,1e-13,file);
+    for (double time = 0.0; time <=1000 ; time += 1.0) {
+        testPoisson2D.push_time(time,1e-14,file);
     }
         
 
