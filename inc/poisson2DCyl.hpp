@@ -34,6 +34,9 @@ class Poisson2DCyl{
 		std::vector<std::pair<int, double>> eps_vec; // Dieletric constant across along z
 		std::vector<std::pair<int, double>> sig_vec; // Surface charge densety along z
 
+		Eigen::Vector<double, Eigen::Dynamic> eps;
+		Eigen::Vector<double, Eigen::Dynamic> sig;
+
 		//double **v;	
 		
 		double **phie;
@@ -59,10 +62,10 @@ class Poisson2DCyl{
 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> rho;
 		
-		Poisson2DCyl(int, int, double, double, std::vector<std::pair<int, double>>, std::vector<std::pair<int, double>>); // n, m, rstep, zstep eps, sig
+		Poisson2DCyl(int, int, double, double, Eigen::VectorXd, Eigen::VectorXd); // n, m, rstep, zstep eps, sig
 
-		void solve(double, double, double, double ,double (*)(double, double), double[4], std::string);
-		void solve(double, double, double, double ,Eigen::MatrixXd, Eigen::MatrixXd, double[4], std::string);
+		//void solve(double, double, double, double ,double (*)(double, double), double[4]);
+		void solve(double, double, double, double ,Eigen::MatrixXd, Eigen::MatrixXd, double[4]);
 
 		void solve_Poisson();
 
@@ -70,5 +73,5 @@ class Poisson2DCyl{
 
 		void calculate_charge_density();
 
-		void write_fields();
+		void write_fields(std::string);
 };

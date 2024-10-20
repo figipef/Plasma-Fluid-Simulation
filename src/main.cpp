@@ -65,6 +65,9 @@ int main() {
     //std::vector<std::pair<int, double>> sig_vec = {{49,8e-5}};
     std::vector<std::pair<int, double>> sig_vec = {{0,0}};
 
+    Eigen::VectorXd eps = Eigen::VectorXd::Constant(size_z, epsi);
+    Eigen::VectorXd sig = Eigen::VectorXd::Constant(size_z, 0);
+
     Poisson1DCart testPoisson1D(12, 1, 0.);
 
     testPoisson1D.dirichlet(10, false, false, 0, 10.0, &ZERO);
@@ -75,13 +78,14 @@ int main() {
 
     //testPoisson1D.dirichlet(5, true, true, 0, 10, &constant);
 
-    Poisson2DCyl testPoisson2D(size_r,size_z,0.001,0.001,eps_vec, sig_vec);
+    Poisson2DCyl testPoisson2D(size_r,size_z,0.0001,0.0001,eps, sig);
 
     //testPoisson2D.solve(0,0,0,0, &ZERO2D, fronteira_livre, "zero");
 
-    testPoisson2D.solve(10e4,0,0,0, ne,ni, fronteira_livre, "zero");
+    testPoisson2D.solve(0,0,0,0, ne,ni, fronteira_livre);
     //testPoisson2D.solve(10,0,0,0, ne,ni, fronteira_livre, "zero");
     testPoisson2D.solve_Poisson();
+    testPoisson2D.write_fields("i");
     //testPoisson2D.solve_Poisson();    
 
     std::cout<<"test"<<std::endl;
@@ -91,10 +95,12 @@ int main() {
         std::cerr << "Error opening file!\n";
         return 1;
     }
-    for (double time = 0.0; time <=1000 ; time += 1.0) {
+    for (double time = 0.0; time <=100; time += 1.0) {
+
         testPoisson2D.push_time(time,1e-14,file);
     }
-        
+    
+    testPoisson2D.write_fields("f");
 
     return 0;
 }
