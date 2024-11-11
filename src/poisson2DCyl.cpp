@@ -20,6 +20,8 @@ Poisson2DCyl::Poisson2DCyl(int n, int m, double dr, double dz, Eigen::VectorXd e
 	r_step = dr;
 	z_step = dz;
 
+	t = 0;
+
 	double hdz = dz/2;
 	double hdr = dr/2;
 
@@ -351,25 +353,41 @@ void Poisson2DCyl::push_time(double ti, double dt, std::ofstream& file){
 	Eigen::MatrixXd f_E = Eigen::MatrixXd::Zero(r_size, z_size);
 	Eigen::MatrixXd f_N = Eigen::MatrixXd::Zero(r_size, z_size);
 	Eigen::MatrixXd f_S = Eigen::MatrixXd::Zero(r_size, z_size);
+	Eigen::MatrixXd f_Z = Eigen::MatrixXd::Zero(r_size, z_size);
 	//double f_W;
 	//double f_E;
 	//double f_N;
 	//double f_S;
 
-	double vr_max = 0;
-	double vz_max = 0;
+	// for testing purposes
+	/*
+	Er = Eigen::MatrixXd::Zero(r_size - 1, z_size);
+	Ez1 = Eigen::MatrixXd::Constant(r_size, z_size - 1, 1);
+	Ez2 = Eigen::MatrixXd::Constant(r_size, z_size - 1, 1);
+
+	De = 0;
+	mu = 0.625;
+	*/
+	double vr_max = std::max({std::fabs(mu * Ez1.maxCoeff()), std::fabs(mu * Ez2.maxCoeff())});
+	double vz_max = std::max({std::fabs(mu * Er.maxCoeff()), std::fabs(mu * Er.maxCoeff())});
+
+	dt = std::min({0.5 * z_step/vz_max, 0.5 * r_step/vr_max, 0.125* z_step*z_step/De, 0.125 * r_step*r_step, 0.1 * 8.85e-12/(mu * ne.maxCoeff()* 1.6e-19)});
+
+	//dt = z_step;
 
 	for (int i = 0; i < r_size; i++){
 
 		for (int j = 0; j < z_size; ++j){ // ter atencao n(i,j) * mu
 
+			
 			if (i == 0){
 
 				f_S(i,j) = 0;
 
 			} else {
 
-				f_S(i,j) = (-(ne(i-1,j) + ne(i,j))/2 * mu * Er(i - 1,j) - De * (ne(i,j) - ne(i - 1, j)) / r_step) * S_vert(i - 1,j);
+				//f_S(i,j) = -(ne(i,j) * mu * Er(i - 1,j) - De * (ne(i,j) - ne(i - 1, j)) / r_step) * S_vert(i - 1,j);
+				f_S(i,j) = 0;
 			}
 
 			if (i == r_size - 1){
@@ -378,31 +396,76 @@ void Poisson2DCyl::push_time(double ti, double dt, std::ofstream& file){
 
 			} else {
 
-				f_N(i,j) = (-ne(i,j) * mu * Er(i,j) - De * (ne(i + 1,j) - ne(i, j)) / r_step) * S_vert(i,j); 
+				//f_N(i,j) = (-ne(i,j) * mu * Er(i,j) - De * (ne(i + 1,j) - ne(i, j)) / r_step) * S_vert(i,j); 
+				f_N(i,j) = 0;
 			}
 
+			//std::cout <<"1"<<std::endl;
+			/*
 			if (j == 0){
 
 				f_W(i,j) = 0;
 
+				// For testing
+				
+				f_W(i,j) = (-(ne(i,j) + 0.5 * getSign(ne(i,j),ne(i,z_size - 1))*(z_step - mu*Ez2(i, z_size-2)*dt)*std::min((ne(i,j) - ne(i,z_size - 1))/z_step, (ne(i,j+1) - ne(i,j))/z_step )) * mu * Ez2(i,z_size - 2) - De * ne_E_flux) * S_hori(i,j);
+				//std::cout <<"1"<<std::endl;
+				
 			} else {
 
-				f_W(i,j) = (-(ne(i,j-1)+ne(i,j))/2 * mu * Ez2(i,j - 1) - De * ne_E_flux) * S_hori(i,j - 1); // CHECK EZ2 !!
+				//f_W(i,j) = (-(ne(i,j-1) + ne(i,j))/2 * mu * Ez2(i,j - 1) - De * ne_E_flux) * S_hori(i,j - 1); // CHECK EZ2 !!
+			
+				// For testing
+				
+				if ( j < z_size - 1){
+					f_W(i,j) = (-(ne(i,j) - 0.5 * getSign(ne(i,j),ne(i,j-1))*(z_step - mu*std::fabs(Ez2(i, j-1))*dt)*std::min(std::fabs(ne(i,j) - ne(i,j-1))/z_step, std::fabs(ne(i,j+1) - ne(i,j))/z_step )) * mu * Ez2(i,j - 1) - De * ne_E_flux) * S_hori(i,j - 1);
+				} else {
+					//f_W(i,j) = (-(ne(i,j) + 0.5 * getSign(ne(i,j),ne(i,j-1))*(z_step - mu*Ez2(i, j-1)*dt)*std::min((ne(i,j) - ne(i,j-1))/z_step, (ne(i,  0) - ne(i,j))/z_step )) * mu * Ez2(i,j - 1) - De * ne_E_flux) * S_hori(i,j - 1);
+					f_W(i,j) = (-(ne(i,j) - 0.5 * getSign(ne(i,j),ne(i,j-1))*(z_step - mu*std::fabs(Ez2(i, j-1))*dt)*std::min(std::fabs(ne(i,j) - ne(i,j-1))/z_step, std::fabs(0 - ne(i,j))/z_step )) * mu * Ez2(i,j - 1) - De * ne_E_flux) * S_hori(i,j - 1);
+				}
+				
+				//std::cout <<"2"<<std::endl;
 			}
 
 			if (j < z_size -1){
+
 				ne_E_flux = (ne(i,j + 1) - ne(i, j)) / z_step;
+			} else {
+				// for testing
+				ne_E_flux = (ne(i,0) - ne(i, j)) / z_step;
 			}
 			
 			if (j == z_size - 1){
 			
 				f_E(i,j) = 0;
-			
+					
+				
+				// For testing
+
+				f_E(i,j) = (-(ne(i,j) + 0.5 * getSign(ne(i,0),ne(i,j))*(z_step - mu*Ez1(i, j - 1)*dt)*std::min((ne(i,j) - ne(i,j-1))/z_step, (ne(i,0) - ne(i,j))/z_step )) * mu * Ez1(i,0) - De * ne_E_flux) * S_hori(i,j);
+				
+				
 			} else {
 			
-				f_E(i,j) = (-ne(i,j) * mu * Ez1(i,j) - De * ne_E_flux) * S_hori(i,j); // CHECK EZ1 !!
+				//f_E(i,j) = (-(ne(i,j) + ne(i,j+1))/2 * mu * Ez1(i,j) - De * ne_E_flux) * S_hori(i,j); // CHECK EZ1 !!
+				
+				
+				// For testing
+				if (j > 0) {
+					f_E(i,j) = (-(ne(i,j) + 0.5 * getSign(ne(i,j+1),ne(i,j))*(z_step - mu*std::fabs(Ez1(i, j))*dt)*std::min(std::fabs(ne(i,j) - ne(i,j-1))/z_step, std::fabs(ne(i,j+1) - ne(i,j))/z_step )) * mu * Ez1(i,j) - De * ne_E_flux) * S_hori(i,j);	
+				} else {
+					f_E(i,j) = (-(ne(i,j) + 0.5 * getSign(ne(i,j+1),ne(i,j))*(z_step - mu*std::fabs(Ez1(i, j))*dt)*std::min(std::fabs(ne(i,j) -         0)/z_step, std::fabs(ne(i,j+1) - ne(i,j))/z_step )) * mu * Ez1(i,j) - De * ne_E_flux) * S_hori(i,j);
+				
+				}
+				
+				//std::cout <<"4"<<std::endl;
+				
+
 			}
 
+			*/
+			//std::cout<<S_hori(i,j)<<std::endl;
+			/*
 			if (std::abs(f_E(i,j)/S_hori(i,j) / ne(i,j)) > vz_max){
 				vz_max = std::abs(f_E(i,j)/S_hori(i,j) / ne(i,j));
 			}
@@ -417,41 +480,99 @@ void Poisson2DCyl::push_time(double ti, double dt, std::ofstream& file){
 
 			if (i - 1 > 0 ){
 				if (std::abs(f_S(i,j)/S_vert(i - 1,j) / ne(i,j)) > vr_max){
-							vz_max = std::abs(f_S(i,j)/S_vert(i - 1,j) / ne(i,j));
+					vz_max = std::abs(f_S(i,j)/S_vert(i - 1,j) / ne(i,j));
 				}
 			}
-
+			*/
 			// Calculate de change in electron density
 
-			//std::cout<<f_W<<std::endl;
-			//std::cout<<f_E<<std::endl;
-			//std::cout<<f_S<<std::endl;
-			//std::cout<<f_N<<std::endl;
+			// Handle f_W calculations
+			/* 0 FLUX BOUNDARIES
+		    if (j == 0) {
+		        // Wall boundary condition at j = 0 (left edge)
+		        f_W(i, j) = 0;  // No flux entering from the left boundary
 
-			
+		        // Calculate f_E at the left boundary with j+1 term set to zero
+		        f_E(i, j) = -((ne(i, j) + 0.5 * getSign(0, ne(i, j)) * 
+		                     (z_step - mu * std::fabs(Ez1(i, j)) * dt) *
+		                     std::min(std::fabs((ne(i, j) - 0) / z_step), 
+		                              std::fabs((0 - ne(i, j)) / z_step))) 
+		                    * mu * Ez1(i, j) - De * ((ne(i,j + 1) - ne(i, j)) / z_step)) * S_hori(i, j);
+		    } 
+		    else if (j == z_size - 1) {
+		        // Wall boundary condition at j = z_size - 1 (right edge)
+		        f_E(i, j) = 0;  // No flux exiting the right boundary
 
-			//ne(i,j) = ne(i,j) + dt * (Se(i,j) + (f_W - f_E + f_S - f_N)/vols(i,j));//+(f_W - f_E + f_S - f_N)/vols(i,j));
+		        // Calculate f_W at the right boundary with j-1 term set to zero
+		        f_W(i, j) = -((ne(i, j) + 0.5 * getSign(ne(i, j), 0) * 
+		                     (z_step - mu * std::fabs(Ez2(i, j - 1)) * dt) *
+		                     std::min(std::fabs((ne(i, j) - ne(i, j - 1)) / z_step), 
+		                              std::fabs((0 - ne(i, j)) / z_step))) 
+		                    * mu * Ez2(i, j - 1) - De * ((ne(i,j) - ne(i, j - 1)) / z_step)) * S_hori(i, j - 1);
+		    } 
+		    else {
+		        // Internal cells: regular calculation for f_W and f_E
+		        f_W(i, j) = -((ne(i, j) + 0.5 * getSign(ne(i, j), ne(i, j - 1)) * 
+		                     (z_step - mu * std::fabs(Ez2(i, j - 1)) * dt) *
+		                     std::min(std::fabs((ne(i, j) - ne(i, j - 1)) / z_step), 
+		                              std::fabs((ne(i, j + 1) - ne(i, j)) / z_step))) 
+		                    * mu * Ez2(i, j - 1) - De * ((ne(i,j) - ne(i, j - 1)) / z_step)) * S_hori(i, j - 1);
+
+		        f_E(i, j) = -((ne(i, j) + 0.5 * getSign(ne(i, j + 1), ne(i, j)) * 
+		                     (z_step - mu * std::fabs(Ez1(i, j)) * dt) *
+		                     std::min(std::fabs((ne(i, j) - ne(i, j - 1)) / z_step), 
+		                              std::fabs((ne(i, j + 1) - ne(i, j)) / z_step))) 
+		                    * mu * Ez1(i, j) - De * ((ne(i,j + 1) - ne(i, j)) / z_step)) * S_hori(i, j);
+		    }
+			*/
+			// Handle f_W calculations
+		    // --- Convection flux in the z-direction ---
+	        if (j == 0) {
+	            // Reflective boundary at j = 0 (left edge)
+	            f_Z(i, j) = 0;  // No flux at the left boundary
+	        } else if (j == z_size - 1) {
+	            // Reflective boundary at j = z_size - 1 (right edge)
+	            f_Z(i, j) = 0;  // No flux at the right boundary
+	        } else {
+	            // Internal cells: Use the UNO2 scheme to compute convection flux
+	            // For the inward flux, use the left neighbor (j-1)
+	            // For the outward flux, use the right neighbor (j+1)
+
+	            // Convection term in the z-direction (UNO2 scheme)
+	            if (Ez1(i, j) > 0) {
+	                f_Z(i, j) = -(ne(i, j) * mu * Ez1(i, j) - De * (ne(i, j) - ne(i, j - 1)) / z_step) * S_hori(i, j - 1);
+	            } else {
+	                f_Z(i, j) = -(ne(i, j) * mu * Ez1(i, j) - De * (ne(i, j + 1) - ne(i, j)) / z_step) * S_hori(i, j);
+	            }
+	        }
+
+			ne(i, j) = ne(i, j) + dt * (Se(i, j) + (f_Z(i, j) + f_S(i,j) - f_N(i,j)) / vols(i, j)); 
 			
 		}
 	}
-	
-	dt = std::min({0.1 * z_step/vz_max, 0.1 * r_step/vr_max, 0.125* z_step*z_step/De, 0.125 * r_step*r_step, 8.85e-12/(mu * ne.maxCoeff()* vols.maxCoeff())});// 8.85e-12/(mu * ne.maxCoeff())});
-	
-	std::cout<< 0.5 * z_step/vz_max << " "<< 0.5 * r_step/vr_max <<" "<< 0.125* z_step*z_step/De <<" "<< 0.125 * r_step*r_step <<" "<< 8.85e-12/(mu * ne.maxCoeff() * vols.maxCoeff())<<std::endl;
+	//std::cout<<"---"<<std::endl;
+	//std::cout<<f_W<<std::endl;
+	//std::cout<<"---"<<std::endl;
+	//std::cout<<f_E<<std::endl;
 
-	Eigen::MatrixXd result = (f_W - f_E + f_S - f_N).array() / vols.array();
+	// 8.85e-12/(mu * ne.maxCoeff())});
+	//dt = dt;
+	std::cout<< 0.5 * z_step/vz_max << " "<< 0.5 * r_step/vr_max <<" "<< 0.125* z_step*z_step/De <<" "<< 0.125 * r_step*r_step <<" "<< 0.05 * 8.85e-12/(mu * ne.maxCoeff() * 1.6e-19)<<std::endl;
 
-	ne = ne + dt * (Se + result);//+(f_W - f_E + f_S - f_N)/vols(i,j));
+	//Eigen::MatrixXd result = (f_W - f_E + f_S - f_N).array() / vols.array();
 
+	//ne = ne + dt * (Se + result);//+(f_W - f_E + f_S - f_N)/vols(i,j));
+
+	t = t+dt;
 
 	std::cout<< "dt = "<<dt <<std::endl;
 
 	solve_Poisson();
 
-	std::cout<<"Pushed time to "<<ti + dt<<std::endl;
+	std::cout<<"Pushed time to "<<t + dt<<std::endl;
 	//std::cout<<ne<<std::endl;
 
-	file << "Time: " << ti+dt << "\n";
+	file << "Time: " << t << "\n";
     file << rho << "\n";
     file << "----\n";  // Separator for the next matrix 
 };
@@ -519,3 +640,79 @@ void Poisson2DCyl::write_fields(std::string str){
         std::cerr << "Unable to open file\n";
     }
 };
+
+
+// private functions
+
+int Poisson2DCyl::getSign(double a, double b) {
+    double result = a - b;
+
+    if (result > 0) {
+        return 1;  // Positive
+    } else if (result < 0) {
+        return -1; // Negative
+    } else {
+        return 0;  // Zero
+    }
+}
+
+
+void Poisson2DCyl::uno2ConvectionScheme(Eigen::MatrixXd& fieldz,Eigen::MatrixXd& fieldr, double dt, Eigen::MatrixXd velocityz, Eigen::MatrixXd velocityr) {
+
+    //std::vector<double> newField(n, 0.0);
+
+    Eigen::MatrixXd& newFieldz = Eigen::MatrixXd::Zero(r_size, z_size);
+
+    Eigen::MatrixXd& newFieldr = Eigen::MatrixXd::Zero(r_size, z_size);
+
+    // UNO2 scheme
+    for (int i = 0; i < r_size; ++i) {
+
+    	for (int j = 0; j < z_size; ++j){
+
+    		if (j > 0 && j < z_size - 1){
+    
+    			double fluxz = velocityz(i,j-1) * (fieldz(i,j) - fieldz(i,j-1)) / z_step;
+
+		        double slopez = (fieldz(i , j+1) - fieldz(i,j - 1)) / (2.0 * z_step); // Central difference for slope
+
+		        double correctionz = (velocityz(i,j-1) > 0) ? (0.5 * slopez) : (-0.5 * slopez);
+
+		        newFieldz(i,j) = fieldz(i,j) - dt * fluxz + dt * correctionz;
+
+    		} else {
+
+    			newFieldz(i,j) = fieldz(i,j)
+
+    		}
+    		
+    		if (i > 0 && i < r_size - 1){
+    
+    			double fluxr = velocityr * (fieldr(i,j) - fieldr(i - 1,j)) / r_step;
+
+		        double sloper = (fieldz(i+1 , j) - fieldz(i-1,j)) / (2.0 * r_step); // Central difference for slope
+
+		        double correctionr = (velocityr > 0) ? (0.5 * sloper) : (-0.5 * sloper);
+
+		        newFieldr(i,j) = fieldr(i,j) - dt * fluxr + dt * correctionr;
+
+    		} else {
+
+    			newFieldr(i,j) = fieldr(i,j)
+
+    		}
+    	}   
+    }
+
+    // Apply boundary conditions (wall boundary: no flux)
+    // Left boundary (i = 0)
+    newFieldz[0] = fieldz[0];  // No flux at the left wall (fixed value)
+    newFieldz[1] = fieldz[0];  // No flux at the second cell (based on first cell value)
+
+    // Right boundary (i = n-1)
+    newFieldz[n - 1] = fieldz[n - 1];  // No flux at the right wall (fixed value)
+    newFieldz[n - 2] = fieldz[n - 1];  // No flux at the second last cell (based on last cell value)
+
+    // Copy newField to field for the next time step
+    field = newField;
+}

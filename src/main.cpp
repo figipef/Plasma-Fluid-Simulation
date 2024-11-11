@@ -43,13 +43,14 @@ double jan(double r, double z){
 
 int main() {
 
-    int size_r = 50;
-    int size_z = 50;
+    int size_r = 85e-12;
+    int size_z = 20;
 
     std::map<int, double> eps_map;
     std::map<int, double> sig_map;
 
     Eigen::MatrixXd ne = Eigen::MatrixXd::Constant(size_r, size_z, 1e21);
+    //Eigen::MatrixXd ne = Eigen::MatrixXd::Constant(size_r, size_z, 0);
     Eigen::MatrixXd ni = Eigen::MatrixXd::Constant(size_r, size_z, 0);
 
     double fronteira[] = {0,0,1,0};
@@ -68,9 +69,9 @@ int main() {
     Eigen::VectorXd eps = Eigen::VectorXd::Constant(size_z, epsi);
     Eigen::VectorXd sig = Eigen::VectorXd::Constant(size_z, 0);
 
-    Poisson1DCart testPoisson1D(12, 1, 0.);
+    //Poisson1DCart testPoisson1D(12, 1, 0.);
 
-    testPoisson1D.dirichlet(10, false, false, 0, 10.0, &ZERO);
+    //testPoisson1D.dirichlet(10, false, false, 0, 10.0, &ZERO);
 
     //testPoisson1D.dirichlet(5, false, false, 0, 10.0, &constant);
 
@@ -78,6 +79,38 @@ int main() {
 
     //testPoisson1D.dirichlet(5, true, true, 0, 10, &constant);
 
+
+    // =======
+    // Convection schemes Testing
+    // =======
+    /*
+    double height = 10 * 1.6e19;
+    int startRange = 25;   // Starting index for the non-zero range
+    int endRange = 75;     // Ending index for the non-zero range
+
+    // Set values within the specified range to the desired height
+    for (int i = startRange; i < endRange; ++i) {
+        for (int j = 0; j < size_r; j++){
+            ne(j, i) = height;
+        }
+        
+    }
+    */
+    // Create the triangular distribution pattern
+    /*
+    for (int i = 0; i < size_r; ++i) {
+        // Determine the peak value for the current row
+        int peak = (size_z - 1) / 2; // For 9 columns, peak is at index 4
+        for (int j = 0; j <= peak; ++j) {
+            if (j > 20 && j <= peak) {
+                ne(i, j) = (j-20)*1.6e19;             // Increase to peak
+                ne(i, size_z - j - 1) = (j - 20)*1.6e19; // Mirror to create symmetry
+            }
+        }
+    }   
+
+    std::cout << "Triangular Matrix:\n" << ne << std::endl;
+    */
     Poisson2DCyl testPoisson2D(size_r,size_z,0.0001,0.0001,eps, sig);
 
     //testPoisson2D.solve(0,0,0,0, &ZERO2D, fronteira_livre, "zero");
@@ -97,7 +130,7 @@ int main() {
     }
     for (double time = 0.0; time <=100; time += 1.0) {
 
-        testPoisson2D.push_time(time,1e-14,file);
+        testPoisson2D.push_time(time,8e-14,file);
     }
     
     testPoisson2D.write_fields("f");

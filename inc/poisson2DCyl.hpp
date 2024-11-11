@@ -13,6 +13,8 @@ class Poisson2DCyl{
 		double r_step; // dr and dz
 		double z_step;
 
+		double t;
+
 		double v0;
 		double vmax;
 		double vwall;
@@ -74,4 +76,9 @@ class Poisson2DCyl{
 		void calculate_charge_density();
 
 		void write_fields(std::string);
+
+	private:
+		int getSign(double, double);
+
+		void uno2ConvectionScheme(Eigen::MatrixXd&, Eigen::MatrixXd&, double, Eigen::MatrixXd, Eigen::MatrixXd);
 };
