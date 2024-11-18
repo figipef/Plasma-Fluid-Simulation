@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import math
+import numpy as np
 
 def create_square_function_list(size, a):
     # Initialize list with zeros
@@ -10,13 +11,13 @@ def create_square_function_list(size, a):
     end = 3 * size // 4
     
     # Set values to `a` within the specified range
-    for i in range(150, 350):
+    for i in range(100, 200):
         square_list[i] = a
-    """
-    for i in range(300, 350):
+    
+    for i in range(300, 351):
         square_list[i] = a*(i-300)/(50)
-        square_list[199-i] = a*(i-300)/(50)
-"""
+        square_list[400-(i-300)] = a*(i-300)/(50)
+
     return square_list
 
 def sign(a,b):
@@ -27,6 +28,9 @@ def sign(a,b):
     else:
         return 0
 
+def mid_way_f(donor,v,dx,dt,G_C):
+    return donor + 0.5 * sign(v,0)*(dx - abs(v)*dt)*G_C
+
 # Input for list size and the value 'a'
 size = 500
 a = 1
@@ -36,10 +40,12 @@ square_list = create_square_function_list(size, a)
 
 plt.plot(square_list, label="Square Function")
 
-new_square_list = square_list
+UnoPlusList = square_list
+UnoList = square_list
+Uno3MinusList = square_list
+Uno3List = square_list
 
-
-n = 3195
+n = 3200
 
 dx = 1
 mu = 0.625
@@ -49,154 +55,236 @@ u = 1
 dt = mu * dx/u
 
 last_phi_E = 0
-"""
-for i in range(n):
-    first_value = new_square_list[0]
-    last_value = new_square_list[size-1]
-
-    
-    for j in range(size):
-
-        if j == 0:
-            phi_W = last_phi_E
-            phi_E = new_square_list[j]  + 0.5 * sign(new_square_list[j+1], new_square_list[j]) * (dx - u * dt)*min(math.fabs((new_square_list[j] - last_value)/dx), math.fabs((new_square_list[j+1] - new_square_list[j])/dx))
-
-        if j == size - 1:
-            phi_W = last_phi_E
-            phi_E = new_square_list[j]  + 0.5 * sign(first_value, new_square_list[j]) * (dx - u * dt)*min(math.fabs((new_square_list[j] - new_square_list[j-1])/dx), math.fabs((first_value - new_square_list[j])/dx))
-
-        if j > 0 and j < size - 1:
-
-            #if min(math.fabs((new_square_list[j] - new_square_list[j-1])/dx), math.fabs((new_square_list[j+1] - new_square_list[j])/dx)) != 0:
-            #print(math.fabs((new_square_list[j] - new_square_list[j-1])/dx),math.fabs((new_square_list[j+1] - new_square_list[j])/dx) )    
-            #print(min(math.fabs((new_square_list[j] - new_square_list[j-1])/dx), math.fabs((new_square_list[j+1] - new_square_list[j])/dx)))
-            phi_W = last_phi_E
-            phi_E = new_square_list[j]  + 0.5 * sign(new_square_list[j+1], new_square_list[j]) * (dx - u * dt)*min(math.fabs((new_square_list[j] - new_square_list[j-1])/dx), math.fabs((new_square_list[j+1] - new_square_list[j])/dx))
-
-        #print(phi_W, phi_E)
-        new_square_list[j] = new_square_list[j] + (u*phi_W - u*phi_E) * dt/dx
-        last_phi_E = phi_E
-"""
 
 for i in range(n):
+    print
     # Keep a copy of the current state to avoid modifying while iterating
-    temp_list = new_square_list.copy()
-    
+    temp_list = UnoPlusList.copy()
+    temp2_list = UnoList.copy()
+    temp3_list = Uno3MinusList.copy()
+    temp4_list = Uno3List.copy()
     # Loop through the grid
     for j in range(size):
         if j == 0:
-            #phi_W = temp_list[-1]
-            phi_W = temp_list[-1] + sign(temp_list[j], temp_list[- 1]) * (dx - u * dt) * abs((temp_list[j] - temp_list[- 1]) * (temp_list[j + 1] - temp_list[j]) / (dx*dx))/( abs((temp_list[j] - temp_list[-1]) / dx) + abs((temp_list[j + 1] - temp_list[j]) / dx) + 1e-308) # Periodic boundary on the left side
-            phi_E = temp_list[j] + sign(temp_list[j + 1], temp_list[j]) * (dx - u * dt) * abs((temp_list[j] - temp_list[-1]) * (temp_list[j + 1] - temp_list[j]) / (dx*dx))/( abs((temp_list[j] - temp_list[-1]) / dx) + abs((temp_list[j + 1] - temp_list[j]) / dx) + 1e-308) #min(abs((temp_list[j] - temp_list[-1]) / dx), abs((temp_list[j + 1] - temp_list[j]) / dx))
-            #phi_E = temp_list[j] + 0.5 * sign(temp_list[j + 1], temp_list[j]) * (dx - u * dt) * min(abs((temp_list[j] - temp_list[-1]) / dx), abs((temp_list[j + 1] - temp_list[j]) / dx))
 
+            #UNO2 plus
+
+            phi_W = UnoPlusList[-1] + sign(UnoPlusList[j], UnoPlusList[- 1]) * (dx - u * dt) * abs((UnoPlusList[-1] - UnoPlusList[- 2]) * (UnoPlusList[j] - UnoPlusList[-1]) / (dx*dx))/( abs((UnoPlusList[-1] - UnoPlusList[-2]) / dx) + abs((UnoPlusList[j] - UnoPlusList[-1]) / dx) + 1e-308) # Periodic boundary on the left side
+            phi_E = UnoPlusList[j] + sign(UnoPlusList[j + 1], UnoPlusList[j]) * (dx - u * dt) * abs((UnoPlusList[j] - UnoPlusList[-1]) * (UnoPlusList[j + 1] - UnoPlusList[j]) / (dx*dx))/( abs((UnoPlusList[j] - UnoPlusList[-1]) / dx) + abs((UnoPlusList[j + 1] - UnoPlusList[j]) / dx) + 1e-308) #min(abs((temp_list[j] - temp_list[-1]) / dx), abs((temp_list[j + 1] - temp_list[j]) / dx))
+
+            #UNO2
+
+            phi_W2 = UnoList[-1] + 0.5 * sign(UnoList[j], UnoList[- 1]) * (dx - u * dt) * min(abs((UnoList[-1] - UnoList[-2]) / dx), abs((UnoList[j] - UnoList[-1]) / dx))
+            phi_E2 = UnoList[j] + 0.5 * sign(UnoList[j + 1], UnoList[j]) * (dx - u * dt) * min(abs((UnoList[j] - UnoList[-1]) / dx), abs((UnoList[j + 1] - UnoList[j]) / dx))
+
+            #UNO3 minus
+
+            G_DC = (Uno3MinusList[j] - Uno3MinusList[-1])/dx
+            G_CU = (Uno3MinusList[-1] - Uno3MinusList[-2])/dx
+
+            if abs(G_DC - G_CU) <= 1.2 * abs(G_DC + G_CU)*0.5:
+                G_C = G_DC - 2* (dx + u * dt)/3*(G_DC - G_CU)/(2*dx)
+            else:
+                G_C = sign(G_DC,0)*2*abs(G_DC * G_CU)/(abs(G_DC) + abs(G_CU) + 1e-308)
+
+            phi_W3 = mid_way_f(Uno3MinusList[-1], u, dx, dt, G_C)
+
+            G_DC = (Uno3MinusList[j+1] - Uno3MinusList[j])/dx
+            G_CU = (Uno3MinusList[j] - Uno3MinusList[-1])/dx
+
+            if abs(G_DC - G_CU) <= 1.2 * abs(G_DC + G_CU)*0.5:
+                G_C = G_DC - 2* (dx + u * dt)/3*(G_DC - G_CU)/(2*dx)
+            else:
+                G_C = sign(G_DC,0)*2*abs(G_DC * G_CU)/(abs(G_DC) + abs(G_CU) + 1e-308)
+
+            phi_E3 = mid_way_f(Uno3MinusList[j], u, dx, dt, G_C)
+
+            #UNO3
+
+            G_DC = (Uno3List[j] - Uno3List[-1])/dx
+            G_CU = (Uno3List[-1] - Uno3List[-2])/dx
+
+            if abs(G_DC - G_CU) <= 1.2 * abs(G_DC + G_CU)*0.5:
+                G_C = G_DC - 2 * (dx + u * dt)/3*(G_DC - G_CU)/(2*dx)
+            elif G_DC * G_CU > 0:
+                G_C = sign(G_DC,0)*2*min(abs(G_DC), abs(G_CU))
+            else:
+                G_C = sign(G_DC,0)*min(abs(G_DC), abs(G_CU))
+
+            phi_W4 = mid_way_f(Uno3List[-1], u, dx, dt, G_C)
+
+            G_DC = (Uno3List[j+1] - Uno3List[j])/dx
+            G_CU = (Uno3List[j] - Uno3List[-1])/dx
+
+            if abs(G_DC - G_CU) <= 1.2 * abs(G_DC + G_CU)*0.5:
+                G_C = G_DC - 2 * (dx + u * dt)/3*(G_DC - G_CU)/(2*dx)
+            elif G_DC * G_CU > 0:
+                G_C = sign(G_DC,0)*2*min(abs(G_DC), abs(G_CU))
+            else:
+                G_C = sign(G_DC,0)*min(abs(G_DC), abs(G_CU))
+
+            phi_E4 = mid_way_f(Uno3List[j], u, dx, dt, G_C)
 
         elif j == size - 1:
-            phi_W = temp_list[j - 1] + sign(temp_list[j], temp_list[j - 1]) * (dx - u * dt)* abs((temp_list[j] - temp_list[j - 1]) * (temp_list[0] - temp_list[j]) / (dx*dx))/( abs((temp_list[j] - temp_list[j-1]) / dx) + abs((temp_list[0] - temp_list[j]) / dx) + 1e-308) # * min(abs((temp_list[j] - temp_list[j - 1]) / dx), abs((temp_list[0] - temp_list[j]) / dx))
-            #phi_W = temp_list[j - 1] + 0.5 * sign(temp_list[j], temp_list[j - 1]) * min(abs((temp_list[j] - temp_list[j - 1]) / dx), abs((temp_list[0] - temp_list[j]) / dx))
-            #phi_E = temp_list[0]  # Periodic boundary on the right side
-            phi_E = temp_list[j] + sign(temp_list[0], temp_list[j]) * (dx - u * dt) * abs((temp_list[j] - temp_list[j - 1]) * (temp_list[0] - temp_list[j]) / (dx*dx))/( abs((temp_list[j] - temp_list[j-1]) / dx) + abs((temp_list[0] - temp_list[j]) / dx) + 1e-308)#min(abs((temp_list[j] - temp_list[j - 1]) / dx), abs((temp_list[j + 1] - temp_list[j]) / dx))
+
+            #UNO2 plus
+
+            phi_W = UnoPlusList[j - 1] + sign(UnoPlusList[j], UnoPlusList[j - 1]) * (dx - u * dt)* abs((UnoPlusList[j - 1] - UnoPlusList[j - 2]) * (UnoPlusList[j] - UnoPlusList[j-1]) / (dx*dx))/( abs((UnoPlusList[j-1] - UnoPlusList[j-2]) / dx) + abs((UnoPlusList[j] - UnoPlusList[j - 1]) / dx) + 1e-308) # * min(abs((temp_list[j] - temp_list[j - 1]) / dx), abs((temp_list[0] - temp_list[j]) / dx))
+            phi_E = UnoPlusList[j] + sign(UnoPlusList[0], UnoPlusList[j]) * (dx - u * dt) * abs((UnoPlusList[j] - UnoPlusList[j - 1]) * (UnoPlusList[0] - UnoPlusList[j]) / (dx*dx))/( abs((UnoPlusList[j] - UnoPlusList[j-1]) / dx) + abs((UnoPlusList[0] - UnoPlusList[j]) / dx) + 1e-308)#min(abs((temp_list[j] - temp_list[j - 1]) / dx), abs((temp_list[j + 1] - temp_list[j]) / dx))
+            
+            #UNO2
+
+            phi_W2 = UnoList[j - 1] + 0.5 * sign(UnoList[j], UnoList[j - 1]) * (dx - u * dt)* min(abs((UnoList[j-1] - UnoList[j - 2]) / dx), abs((UnoList[j] - UnoList[j-1]) / dx))
+            phi_E2 = UnoList[j] + 0.5 * sign(UnoList[0], UnoList[j]) * (dx - u * dt) * min(abs((UnoList[j] - UnoList[j - 1]) / dx), abs((UnoList[0] - UnoList[j]) / dx))
+
+            #UNO3 minus
+
+            G_DC = (Uno3MinusList[j] - Uno3MinusList[j-1])/dx
+            G_CU = (Uno3MinusList[j-1] - Uno3MinusList[j-2])/dx
+
+            if abs(G_DC - G_CU) <= 1.2 * abs(G_DC + G_CU)*0.5:
+                G_C = G_DC - 2* (dx + u * dt)/3*(G_DC - G_CU)/(2*dx)
+            else:
+                G_C = sign(G_DC,0)*2*abs(G_DC * G_CU)/(abs(G_DC) + abs(G_CU) + 1e-308)
+
+            phi_W3 = mid_way_f(Uno3MinusList[j-1], u, dx, dt, G_C)
+
+            G_DC = (Uno3MinusList[0] - Uno3MinusList[j])/dx
+            G_CU = (Uno3MinusList[j] - Uno3MinusList[j-1])/dx
+
+            if abs(G_DC - G_CU) <= 1.2 * abs(G_DC + G_CU)*0.5:
+                G_C = G_DC - 2* (dx + u * dt)/3*(G_DC - G_CU)/(2*dx)
+            else:
+                G_C = sign(G_DC,0)*2*abs(G_DC * G_CU)/(abs(G_DC) + abs(G_CU) + 1e-308)
+
+            phi_E3 = mid_way_f(Uno3MinusList[j], u, dx, dt, G_C)
+
+            #UNO3
+            G_DC = (Uno3List[j] - Uno3List[j-1])/dx
+            G_CU = (Uno3List[j-1] - Uno3List[j-2])/dx
+
+            if abs(G_DC - G_CU) <= 1.2 * abs(G_DC + G_CU)*0.5:
+                G_C = G_DC - 2 * (dx + u * dt)/3*(G_DC - G_CU)/(2*dx)
+            elif G_DC * G_CU > 0:
+                G_C = sign(G_DC,0)*2*min(abs(G_DC), abs(G_CU))
+            else:
+                G_C = sign(G_DC,0)*min(abs(G_DC), abs(G_CU))
+
+            phi_W4 = mid_way_f(Uno3List[j-1], u, dx, dt, G_C)
+
+            G_DC = (Uno3List[0] - Uno3List[j])/dx
+            G_CU = (Uno3List[j] - Uno3List[j-1])/dx
+
+            if abs(G_DC - G_CU) <= 1.2 * abs(G_DC + G_CU)*0.5:
+                G_C = G_DC - 2 * (dx + u * dt)/3*(G_DC - G_CU)/(2*dx)
+            elif G_DC * G_CU > 0:
+                G_C = sign(G_DC,0)*2*min(abs(G_DC), abs(G_CU))
+            else:
+                G_C = sign(G_DC,0)*min(abs(G_DC), abs(G_CU))
+
+            phi_E4 = mid_way_f(Uno3List[j], u, dx, dt, G_C)
 
         else:
-            phi_W = temp_list[j - 1] + sign(temp_list[j], temp_list[j - 1]) * (dx - u * dt) * abs((temp_list[j] - temp_list[j - 1]) * (temp_list[j + 1] - temp_list[j]) / (dx*dx))/( abs((temp_list[j] - temp_list[j-1]) / dx) + abs((temp_list[j + 1] - temp_list[j]) / dx) + 1e-308) #* min(abs((temp_list[j] - temp_list[j - 1]) / dx), abs((temp_list[j + 1] - temp_list[j]) / dx))
-            phi_E = temp_list[j] + sign(temp_list[j + 1], temp_list[j]) * (dx - u * dt) * abs((temp_list[j] - temp_list[j - 1]) * (temp_list[j + 1] - temp_list[j]) / (dx*dx))/( abs((temp_list[j] - temp_list[j-1]) / dx) + abs((temp_list[j + 1] - temp_list[j]) / dx) + 1e-308)#min(abs((temp_list[j] - temp_list[j - 1]) / dx), abs((temp_list[j + 1] - temp_list[j]) / dx))
+            #UNO2 plus
 
-            #phi_W = temp_list[j - 1] + 0.5 * sign(temp_list[j], temp_list[j - 1]) * (dx - u * dt) * min(abs((temp_list[j] - temp_list[j - 1]) / dx), abs((temp_list[j + 1] - temp_list[j]) / dx))
-            #phi_E = temp_list[j] + 0.5 * sign(temp_list[j + 1], temp_list[j]) * (dx - u * dt) * min(abs((temp_list[j] - temp_list[j - 1]) / dx), abs((temp_list[j + 1] - temp_list[j]) / dx))
+            phi_W = UnoPlusList[j - 1] + sign(UnoPlusList[j], UnoPlusList[j - 1]) * (dx - u * dt) * abs((UnoPlusList[j-1] - UnoPlusList[j - 2]) * (UnoPlusList[j] - UnoPlusList[j-1 ]) / (dx*dx))/( abs((UnoPlusList[j-1] - UnoPlusList[j-2]) / dx) + abs((UnoPlusList[j] - UnoPlusList[j-1]) / dx + 1e-308)) #* min(abs((temp_list[j] - temp_list[j - 1]) / dx), abs((temp_list[j + 1] - temp_list[j]) / dx))
+            phi_E = UnoPlusList[j] + sign(UnoPlusList[j + 1], UnoPlusList[j]) * (dx - u * dt) * abs((UnoPlusList[j] - UnoPlusList[j - 1]) * (UnoPlusList[j + 1] - UnoPlusList[j]) / (dx*dx))/( abs((UnoPlusList[j] - UnoPlusList[j-1]) / dx) + abs((UnoPlusList[j+ 1] - UnoPlusList[j]) / dx + 1e-308))#min(abs((temp_list[j] - temp_list[j - 1]) / dx), abs((temp_list[j + 1] - temp_list[j]) / dx))
 
-        # Update new_square_list using phi_W and phi_E
-        new_square_list[j] = temp_list[j] + (u * phi_W - u * phi_E) * dt / dx
+            #UNO2
 
-print(new_square_list)
+            phi_W2 = UnoList[j - 1] + 0.5 * sign(UnoList[j], UnoList[j - 1]) * (dx - u * dt) * min(abs(UnoList[j-1] - UnoList[j - 2])/dx, abs(UnoList[j] - UnoList[j-1 ]) / dx) #* min(abs((temp_list[j] - temp_list[j - 1]) / dx), abs((temp_list[j + 1] - temp_list[j]) / dx))
+            phi_E2 = UnoList[j] + 0.5 * sign(UnoList[j + 1], UnoList[j]) * (dx - u * dt) * min(abs((UnoList[j] - UnoList[j - 1]) / dx), abs((UnoList[j + 1] - UnoList[j]) / dx))
+            
+            #UNO3 minus
+
+            G_DC = (Uno3MinusList[j] - Uno3MinusList[j-1])/dx
+            G_CU = (Uno3MinusList[j-1] - Uno3MinusList[j-2])/dx
+
+            if abs(G_DC - G_CU) <= 1.2 * abs(G_DC + G_CU)*0.5:
+                G_C = G_DC - 2 * (dx + u * dt)/3*(G_DC - G_CU)/(2*dx)
+            else:
+                G_C = sign(G_DC,0)*2*abs(G_DC * G_CU)/(abs(G_DC) + abs(G_CU) + 1e-308)
+
+            phi_W3 = mid_way_f(Uno3MinusList[j-1], u, dx, dt, G_C)
+
+            G_DC = (Uno3MinusList[j+1] - Uno3MinusList[j])/dx
+            G_CU = (Uno3MinusList[j] - Uno3MinusList[j-1])/dx
+
+            if abs(G_DC - G_CU) <= 1.2 * abs(G_DC + G_CU)*0.5:
+                G_C = G_DC - 2 * (dx + u * dt)/3*(G_DC - G_CU)/(2*dx)
+            else:
+                G_C = sign(G_DC,0)*2*abs(G_DC * G_CU)/(abs(G_DC) + abs(G_CU) + 1e-308)
+
+            phi_E3 = mid_way_f(Uno3MinusList[j], u, dx, dt, G_C)
+
+            #UNO3
+
+            G_DC = (Uno3List[j] - Uno3List[j-1])/dx
+            G_CU = (Uno3List[j-1] - Uno3List[j-2])/dx
+
+            if abs(G_DC - G_CU) <= 1.2 * abs(G_DC + G_CU)*0.5:
+                G_C = G_DC - 2 * (dx + u * dt)/3*(G_DC - G_CU)/(2*dx)
+            elif G_DC * G_CU > 0:
+                G_C = sign(G_DC,0)*2*min(abs(G_DC), abs(G_CU))
+            else:
+                G_C = sign(G_DC,0)*min(abs(G_DC), abs(G_CU))
+
+            phi_W4 = mid_way_f(Uno3List[j-1], u, dx, dt, G_C)
+
+            G_DC = (Uno3List[j+1] - Uno3List[j])/dx    
+            G_CU = (Uno3List[j] - Uno3List[j-1])/dx
+
+            if abs(G_DC - G_CU) <= 1.2 * abs(G_DC + G_CU)*0.5:
+                
+                G_C = G_DC - 2 * (dx + u * dt)/3*(G_DC - G_CU)/(2*dx)
+            
+            elif G_DC * G_CU > 0:
+                
+                G_C = sign(G_DC,0)*2*min(abs(G_DC), abs(G_CU))
+            
+            else:
+                
+                G_C = sign(G_DC,0)*min(abs(G_DC), abs(G_CU))
+
+            phi_E4 = mid_way_f(Uno3List[j], u, dx, dt, G_C)
+
+
+        # Update UnoPlusList using phi_W and phi_E
+        temp_list[j] = temp_list[j] + (u * phi_W - u * phi_E) * dt / dx
+        temp2_list[j] = temp2_list[j] + (u * phi_W2 - u * phi_E2) * dt / dx
+        temp3_list[j] = temp3_list[j] + (u * phi_W3 - u * phi_E3) * dt / dx
+        temp4_list[j] = temp4_list[j] + (u * phi_W4 - u * phi_E4) * dt / dx
+
+    UnoPlusList = temp_list.copy()
+    UnoList = temp2_list.copy()
+    Uno3MinusList = temp3_list.copy()
+    Uno3List = temp4_list.copy()
+
+#print(UnoPlusList)
 # Plot the list
 
-plt.plot(new_square_list, label="new_Square Function")
+rms = np.sqrt(np.mean((np.array(UnoPlusList) - np.array(square_list))**2))
+
+print("RMS for UNO2+:", rms)
+
+rms = np.sqrt(np.mean((np.array(UnoList) - np.array(square_list))**2))
+
+print("RMS for UNO2:", rms)
+
+rms = np.sqrt(np.mean((np.array(Uno3MinusList) - np.array(square_list))**2))
+
+print("RMS for UNO3-:", rms)
+
+rms = np.sqrt(np.mean((np.array(Uno3List) - np.array(square_list))**2))
+
+print("RMS for UNO3:", rms)
+
+plt.plot(UnoPlusList, label="UNO2+")
+plt.plot(UnoList, label="UNO2")
+plt.plot(Uno3MinusList, label="UNO3-")
+plt.plot(Uno3List, label="UNO3")
 plt.title("Square Function Plot")
 plt.xlabel("Index")
 plt.ylabel("Value")
 plt.legend()
 plt.show()
-"""
-import numpy as np
-import matplotlib.pyplot as plt
-
-# Parameters
-nx = size             # Number of spatial points
-L = 1.0              # Length of domain
-dx = L / (nx - 1)    # Spatial step size
-v = 1.0              # Velocity of advection
-CFL = 0.625           # CFL number
-dt = CFL * dx / v    # Time step based on CFL
-
-# Grid and initial condition
-x = np.linspace(0, L, nx)
-#u = np.zeros(nx)
-u = square_list
-# Initial condition: square function
-#u[int(nx / 4):int(3 * nx / 4)] = 1
-
-# UNO2 function for flux-limited advection
-def uno2_flux_limiter(u, dx):
-    flux = np.zeros_like(u)
-    # Compute fluxes for each point except boundaries
-    for i in range(1, nx - 1):
-        # Left-biased and right-biased differences
-        ul = u[i] - u[i - 1]
-        ur = u[i + 1] - u[i]
-        #print(ul, ur)
-        # Calculate smoothness to determine if limiter is needed
-        if ul * ur > 0:
-            # Smooth region, use second-order interpolation
-            flux[i] = u[i] + 0.5 * minmod(ul, ur)
-        else:
-            # Discontinuity detected, use first-order upwind flux
-            flux[i] = u[i]
-
-
-    ul = u[0] - u[nx-1]
-    ur = u[1] - u[0]
-   
-    if ul * ur > 0:
-        # Smooth region, use second-order interpolation
-        flux[0] = u[0] + 0.5 * minmod(ul, ur)
-    else:
-        # Discontinuity detected, use first-order upwind flux
-        flux[0] = u[0]
-
-    ul = u[nx-1] - u[nx-2]
-    ur = u[0] - u[nx-1]
-   
-    if ul * ur > 0:
-        # Smooth region, use second-order interpolation
-        flux[nx-1] = u[nx-1] + 0.5 * minmod(ul, ur)
-    else:
-        # Discontinuity detected, use first-order upwind flux
-        flux[nx-1] = u[nx-1]
-
-    return flux
-
-# Minmod limiter to control oscillations
-def minmod(a, b):
-    if a * b > 0:
-        return min(abs(a), abs(b)) * np.sign(a)
-    else:
-        return 0.0
-
-# Time-stepping loop
-nt = 3200  # Number of time steps
-for _ in range(nt):
-    # Compute fluxes with UNO2 scheme
-    flux = uno2_flux_limiter(u, dx)
-    
-    # Update solution
-    for i in range(1, nx):
-        u[i] -= v * (flux[i] - flux[i - 1]) * dt / dx
-    u[0] -= v * (flux[0] - flux[nx - 1]) * dt / dx
-# Plot the result
-plt.plot(u, label="UNO2 Solution")
-plt.xlabel("x")
-plt.ylabel("u")
-plt.title("Advection using UNO2 Scheme")
-plt.legend()
-plt.show()
-"""

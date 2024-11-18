@@ -81,4 +81,10 @@ class Poisson2DCyl{
 		int getSign(double, double);
 
 		void uno2ConvectionScheme(Eigen::MatrixXd&, Eigen::MatrixXd&, double, Eigen::MatrixXd, Eigen::MatrixXd);
+
+		double midWayFlux(double, double, double, double, double);
+
+		double calculate_g_c(double, double, double, double, double);
+
+
 };

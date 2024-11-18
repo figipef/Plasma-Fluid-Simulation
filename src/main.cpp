@@ -43,8 +43,8 @@ double jan(double r, double z){
 
 int main() {
 
-    int size_r = 85e-12;
-    int size_z = 20;
+    int size_r = 4;
+    int size_z = 50;
 
     std::map<int, double> eps_map;
     std::map<int, double> sig_map;
@@ -128,7 +128,7 @@ int main() {
         std::cerr << "Error opening file!\n";
         return 1;
     }
-    for (double time = 0.0; time <=100; time += 1.0) {
+    for (double time = 0.0; time <=10000; time += 1.0) {
 
         testPoisson2D.push_time(time,8e-14,file);
     }
