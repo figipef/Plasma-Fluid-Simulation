@@ -9,11 +9,12 @@
 #include <Eigen/SparseCholesky>
 #include <fstream>   // For std::ofstream
 #include <iostream>  // For std::cerr
+#include <chrono>
 
-double epsi = 8.85e-12;
+double epsi =8.85418781762e-12;
 
 double no_epsi = 1;
-
+/*
 double ZERO(double x){
     x=1;
     return 0;
@@ -40,20 +41,45 @@ double jan(double r, double z){
     return (6 - 4 * r* r - 4*z*z)*exp(-r*r -z*z);
 }
 
+*/
+
+// Function to perform polynomial fitting
+Eigen::VectorXd polynomialFit(const std::vector<double>& x, const std::vector<double>& y, int degree, bool type) {
+    int n = x.size();
+    Eigen::MatrixXd X(n, degree + 1);
+    Eigen::VectorXd Y(n);
+
+    // Construct the Vandermonde matrix and the Y vector
+    for (int i = 0; i < n; ++i) {
+        Y(i) = y[i];
+        for (int j = 0; j <= degree; ++j) {
+            if (type){
+                X(i, j) = pow(x[i], j);
+            }else{
+                X(i, j) = pow(log(x[i]), j);
+            }   
+            
+        }
+    }
+
+    // Solve for the polynomial coefficients using the normal equation
+    Eigen::VectorXd coeffs = (X.transpose() * X).ldlt().solve(X.transpose() * Y);
+    return coeffs;
+}
 
 int main() {
 
-    int size_r = 4;
-    int size_z = 50;
+    int size_r = 1;
+    int size_z = 501; // 501
 
     std::map<int, double> eps_map;
     std::map<int, double> sig_map;
 
-    Eigen::MatrixXd ne = Eigen::MatrixXd::Constant(size_r, size_z, 1e21);
+    Eigen::MatrixXd ne = Eigen::MatrixXd::Constant(size_r, size_z, 0);
     //Eigen::MatrixXd ne = Eigen::MatrixXd::Constant(size_r, size_z, 0);
     Eigen::MatrixXd ni = Eigen::MatrixXd::Constant(size_r, size_z, 0);
 
-    double fronteira[] = {0,0,1,0};
+    //double fronteira[] = {0,0,1,0};
     double fronteira_livre[] = {0,0,1,1}; // zmin, zmax, r0, rmax
 
     sig_map[0] = 0;
@@ -83,57 +109,110 @@ int main() {
     // =======
     // Convection schemes Testing
     // =======
-    /*
-    double height = 10 * 1.6e19;
-    int startRange = 25;   // Starting index for the non-zero range
-    int endRange = 75;     // Ending index for the non-zero range
+    
+    double height = 1e20;
+    int startRange = 200; //200   // Starting index for the non-zero range
+    int endRange = 300;   //300  // Ending index for the non-zero range
 
     // Set values within the specified range to the desired height
     for (int i = startRange; i < endRange; ++i) {
         for (int j = 0; j < size_r; j++){
             ne(j, i) = height;
-        }
-        
+            ni(j, i) = height;
+        }   
     }
-    */
-    // Create the triangular distribution pattern
-    /*
-    for (int i = 0; i < size_r; ++i) {
-        // Determine the peak value for the current row
-        int peak = (size_z - 1) / 2; // For 9 columns, peak is at index 4
-        for (int j = 0; j <= peak; ++j) {
-            if (j > 20 && j <= peak) {
-                ne(i, j) = (j-20)*1.6e19;             // Increase to peak
-                ne(i, size_z - j - 1) = (j - 20)*1.6e19; // Mirror to create symmetry
-            }
-        }
-    }   
 
-    std::cout << "Triangular Matrix:\n" << ne << std::endl;
-    */
-    Poisson2DCyl testPoisson2D(size_r,size_z,0.0001,0.0001,eps, sig);
+    // ====================
+    //
+    //  Polynomial Fitting
+    //
+    // ====================
 
-    //testPoisson2D.solve(0,0,0,0, &ZERO2D, fronteira_livre, "zero");
+    std::ifstream mobfile("../bolsig/N2mob.txt"); // Replace "data.txt" with your file name
+    if (!mobfile.is_open()) {
+        std::cerr << "Error: Unable to open the file!" << std::endl;
+        return 1;
+    }
 
-    testPoisson2D.solve(0,0,0,0, ne,ni, fronteira_livre);
-    //testPoisson2D.solve(10,0,0,0, ne,ni, fronteira_livre, "zero");
-    testPoisson2D.solve_Poisson();
+    // Read data from the file
+    std::vector<double> x, y;
+    double xi, yi;
+    while (mobfile >> xi >> yi) {
+        x.push_back(xi);
+        y.push_back(yi);
+    }
+    mobfile.close();
+
+    // Perform polynomial fitting
+    
+
+    std::ifstream tempfile("../bolsig/N2temp.txt"); // Replace "data.txt" with your file name
+    if (!tempfile.is_open()) {
+        std::cerr << "Error: Unable to open the file!" << std::endl;
+        return 1;
+    }
+
+    // Read data from the file
+    std::vector<double> x2, y2;
+    double xi2, yi2;
+    while (tempfile >> xi2 >> yi2) {
+        x2.push_back(xi2);
+        y2.push_back(yi2);
+    }
+    tempfile.close();
+    //std::cout<<y2[0]<<std::endl;
+    int degree = 2; // Adjust the degree of the polynomial as needed
+    Eigen::VectorXd mob_coeffs = polynomialFit(x, y, degree,1);
+    Eigen::VectorXd temp_coeffs = polynomialFit(x2, y2, degree,0);
+
+    std::cout<<mob_coeffs<<std::endl;
+    std::cout<<temp_coeffs<<std::endl;
+
+
+    // =======================
+    //
+    //
+    // =======================
+
+    Poisson2DCyl testPoisson2D(size_r,size_z,20.0e-6,20.0e-6,eps, sig);
+
+    testPoisson2D.set_pol_coeffs(mob_coeffs, temp_coeffs, degree);
+
+    //testPoisson2D.solve(0,0,0,0, &ZERO2D, fronteira_livre, "zero"); 
+    std::ofstream file("rho_data.txt");
+    std::ofstream dt_file("dt_data.txt");
+    
+    testPoisson2D.solve(40e3,0,0,0, ne,ni, fronteira_livre);
+
+    testPoisson2D.solve_Poisson(0);
+
     testPoisson2D.write_fields("i");
+    testPoisson2D.write_dens(file); 
     //testPoisson2D.solve_Poisson();    
 
     std::cout<<"test"<<std::endl;
     
-    std::ofstream file("rho_data.txt");
+    
     if (!file.is_open()) {
         std::cerr << "Error opening file!\n";
         return 1;
     }
-    for (double time = 0.0; time <=10000; time += 1.0) {
+    int i = 0;
+    //while (testPoisson2D.t <= 0) {     //
+    auto start = std::chrono::high_resolution_clock::now();
+    while (testPoisson2D.t <= 5e-9) {
+        testPoisson2D.push_time(i ,8e-14,file,dt_file, 0);
+        i++;
 
-        testPoisson2D.push_time(time,8e-14,file);
     }
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    std::chrono::duration<double, std::milli> d1 = t1 - start;
     
+    std::cout << "Time to Run Code: " << d1.count() << " ms" << std::endl;
+
     testPoisson2D.write_fields("f");
+    testPoisson2D.write_dens(file);
 
     return 0;
 }

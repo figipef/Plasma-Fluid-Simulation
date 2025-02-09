@@ -57,7 +57,7 @@ dt = mu * dx/u
 last_phi_E = 0
 
 for i in range(n):
-    print
+    print(i)
     # Keep a copy of the current state to avoid modifying while iterating
     temp_list = UnoPlusList.copy()
     temp2_list = UnoList.copy()

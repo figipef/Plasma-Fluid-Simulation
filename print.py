@@ -3,8 +3,163 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import math
 from matplotlib.colors import SymLogNorm
+from scipy.optimize import curve_fit
+
+# Initialize lists to store the columns
+column1 = []
+column2 = []
+
+# Open and read the txt file
+with open("bolsig/N2mob.txt", "r") as file:
+    for line in file:
+        # Split each line into two parts
+        values = line.split()
+        # Convert the values to floats and store them in the respective lists
+        column1.append(float(values[0]))
+        column2.append(float(values[1]))
+
+x = np.logspace(-3, 4,100)
+
+def arctan(x,a,b,c,d):
+    return a * np.arctan(np.log10(x) * b - c) + d
+
+# Fit the data with free parameters
+popt, pcov = curve_fit(
+    arctan, 
+    column1, 
+    column2, 
+    p0=[-1e25, 1, -5,1e25]  # Initial guesses for a, b, and c
+)
+
+# Extract fitted parameters
+a_fit, b_fit, c_fit, d_fit = popt
+print(a_fit, b_fit, c_fit, d_fit)
+
+#print(f)
+plt.plot(x, arctan(x, a_fit, b_fit, c_fit, d_fit), 
+         label=f'Fitted arctan: a={a_fit:.2e}, b={b_fit:.2e}, c={c_fit:.2e}', 
+         color='red')
+plt.scatter(column1, column2)
+plt.plot()
+plt.xscale("log")
+plt.yscale("log")
+plt.show()
+
+coeffs = [ 4.19038e+024,
+-2.50599e+024,
+ 3.44633e+023]
+
+# Initialize lists to store the columns
+column1 = []
+column2 = []
+
+# Open and read the txt file
+with open("bolsig/N2temp.txt", "r") as file:
+    for line in file:
+        # Split each line into two parts
+        values = line.split()
+        # Convert the values to floats and store them in the respective lists
+        column1.append(float(values[0]))
+        column2.append(float(values[1]))
+
+#print(column1[0])
+x = np.logspace(-4, 4,1000)
+
+def dif(x):
+
+    if x < 1:
+        return 1e24
+    else:
+        return 1e24 * (np.exp(0.02*np.log( (x*100))**2) - 0.5)
+
+def difusion(x,a1,a2,b2,c2,d2,a3,b3,c3,d3,e3,a4,b4,c4):
+    return np.piecewise(x,
+        [x <= 0.1, (x >0.1) & (x <= 10*np.sqrt(10)), (x > 10 *np.sqrt(10)) & (x <=100), x > 100],
+        [
+            lambda x: a1,
+            lambda x: a2*np.arctan(b2*np.log10(x) - c2) + d2,
+            lambda x: a3*(np.log10(x) -b3)**2 + c3 * (np.log10(x)-d3) + e3,
+            lambda x: a4* np.exp(b4 * np.log10(x)) + c4
+        ])
+
+p0=[9.798e23, 2.9e23, 2.818,2.265e-1,1.397e24,3.770921e24,1.66159,-100,1,1.7099e24,4.918e24,3.711e-1,-8.059e24]  # Initial guesses for a, b, and c
+
+popt, pcov = curve_fit(
+    difusion, 
+    column1, 
+    column2, 
+    p0=p0  # Initial guesses for a, b, and c
+)
+
+a1,a2,b2,c2,d2,a3,b3,c3,d3,e3,a4,b4,c4 = p0
+
+print(a1,a2,b2,c2,d2,a3,b3,c3,d3,e3,a4,b4,c4)
+
+plt.plot(x, difusion(x,a1,a2,b2,c2,d2,a3,b3,c3,d3,e3,a4,b4,c4), 
+         label=f'Fitted arctan: a={a_fit:.2e}, b={b_fit:.2e}, c={c_fit:.2e}', 
+         color='red')
+plt.scatter(column1, column2)
+plt.plot()
+plt.xscale("log")
+plt.yscale("log")
+plt.xlim(1e-4, 10e3)
+
+plt.show()
+
+# Initialize lists to store the columns
+column1 = []
+column2 = []
+
+def b(x):
+
+    if x < 10:
+        return 0
+    else:
+        return 1e-13 * (np.exp(-0.5*( np.log(x*0.0001))**2))
+
+# Open and read the txt file
+with open("bolsig/N2iorate.txt", "r") as file:
+    for line in file:
+        # Split each line into two parts
+        values = line.split()
+        # Convert the values to floats and store them in the respective lists
+        column1.append(float(values[0]))
+        column2.append(float(values[1]))
+
+x = np.logspace(-3, 4,100)
+
+
+#f = pol(x, coeffs, 3,1)
+f = []
+for i in x:
+    #print(i)
+    #print(dif(i))
+    f.append(float(b(i)))
+
+#print(f)
+plt.plot(x, f)
+plt.scatter(column1, column2)
+plt.plot()
+plt.xscale("log")
+#plt.yscale("log")
+
+plt.show()
+
+#plt.plot(x,lst1D[int(i*50):int(i*350)], color= "blue", label="current test")
+
+
+#i = 1
+#x = np.linspace(1,7,i*300)
+#plt.plot(x,matrices[-1][0][int(i*50):int(i*350)], color = "red", label="RK4")
+"""
+i = 1
+x = np.linspace(1,7,i*300)
+plt.plot(x,matrices2[-1][0][int(i*50):int(i*350)], color = "green", label="RK4")
+"""
+
 
 #data = np.loadtxt('jan.txt')
+"""
 data = np.loadtxt('iV.txt')
     
 Er = np.loadtxt('iEr.txt')
@@ -22,8 +177,8 @@ epsi = 8.85e-12;
 for i in range (data.shape[0]):
     r.append((0.5 + i)*dr)
 
-for j in range(data.shape[1]):
-    z.append((0.5 + j)*dz)
+#for j in range(data.shape[1]):
+#    z.append((0.5 + j)*dz)
 
 def jan(r,z):
     return math.exp(-r*r -z*z)
@@ -50,7 +205,7 @@ for i in r:
         rowEr.append(ErJAN(i,j))
         rowEz.append(EzJAN(i,j))
 
-    rowEz.pop()
+#    rowEz.pop()
     teste.append(row)
     Er_teste.append(rowEr)
     Ez_teste.append(rowEz)
@@ -61,15 +216,17 @@ matrix = np.array(teste)
 matrixEr = np.array(Er_teste)
 matrixEz = np.array(Ez_teste)
 
+
+
 # Calculate the global min and max values across all plots
-vmin = min(data.min(), matrix.min())
-vmax = max(data.max(), matrix.max())
+#vmin = min(data.min(), matrix.min())
+#vmax = max(data.max(), matrix.max())
 
-vminEr = min(Er.min(), matrixEr.min())
-vmaxEr = max(Er.max(), matrixEr.max())
+#vminEr = min(Er.min(), matrixEr.min())
+#vmaxEr = max(Er.max(), matrixEr.max())
 
-vminEz = min(Ez.min(), matrixEz.min())
-vmaxEz = max(Ez.max(), matrixEz.max())
+#vminEz = min(Ez.min(), matrixEz.min())
+#vmaxEz = max(Ez.max(), matrixEz.max())
 
 plt.figure(figsize=(15, 5))
 
@@ -83,11 +240,11 @@ plt.ylabel('R_i')
 plt.title(r'Simulation for no charge density')
 plt.gca().invert_yaxis()
 
-print (data -matrix)
+#print (data -matrix)
 # Show the plot
 # Plot 1: Density Plot
 plt.subplot(2, 3, 2)
-scatter = plt.imshow(Er, cmap='pink', interpolation='nearest')#, vmin=vminEr, vmax=vmaxEr)
+#scatter = plt.imshow(Er, cmap='pink', interpolation='nearest')#, vmin=vminEr, vmax=vmaxEr)
 plt.colorbar(label='Data Value')
 plt.xlabel('Z_i')
 plt.ylabel('R_i')
@@ -95,7 +252,7 @@ plt.title(r'Er simul')
 plt.gca().invert_yaxis()
 
 plt.subplot(2, 3, 3)
-scatter = plt.imshow(Ez, cmap='pink', interpolation='nearest')#, vmin=vminEz, vmax=vmaxEz)
+#scatter = plt.imshow(Ez, cmap='pink', interpolation='nearest')#, vmin=vminEz, vmax=vmaxEz)
 plt.colorbar(label='Data Value')
 plt.xlabel('Z_i')
 plt.ylabel('R_i')
@@ -106,8 +263,10 @@ plt.gca().invert_yaxis()
 data = np.loadtxt('fV.txt')
 
 Er = np.loadtxt('fEr.txt')
-
+"""
 Ez = np.loadtxt('fEz1.txt')
+"""
+print(Ez[0])
 
 # Plot 1: Density Plot
 plt.subplot(2, 3, 4)
@@ -119,11 +278,11 @@ plt.ylabel('R_i')
 plt.title(r'Simulation for no charge density')
 plt.gca().invert_yaxis()
 
-print (data -matrix)
+
 # Show the plot
 # Plot 1: Density Plot
 plt.subplot(2, 3, 5)
-scatter = plt.imshow(Er, cmap='pink', interpolation='nearest')#, vmin=vminEr, vmax=vmaxEr)
+#scatter = plt.imshow(Er, cmap='pink', interpolation='nearest')#, vmin=vminEr, vmax=vmaxEr)
 plt.colorbar(label='Data Value')
 plt.xlabel('Z_i')
 plt.ylabel('R_i')
@@ -131,7 +290,7 @@ plt.title(r'Er simul')
 plt.gca().invert_yaxis()
 
 plt.subplot(2, 3, 6)
-scatter = plt.imshow(Ez, cmap='pink', interpolation='nearest')#, vmin=vminEz, vmax=vmaxEz)
+#scatter = plt.imshow(Ez, cmap='pink', interpolation='nearest')#, vmin=vminEz, vmax=vmaxEz)
 plt.colorbar(label='Data Value')
 plt.xlabel('Z_i')
 plt.ylabel('R_i')
@@ -139,7 +298,7 @@ plt.title(r'Ez simul')
 plt.gca().invert_yaxis()
 
 plt.show()
-
+"""
 def load_all_matrices(filename):
     nmax = -1e50;
     nmin = 1e50;
@@ -170,20 +329,29 @@ def load_all_matrices(filename):
 
 # Load the data
 times, matrices, nmax, nmin = load_all_matrices("build/rho_data.txt")
+times2, matrices2, nmax2, nmin2 = load_all_matrices("build/rho_data RK4 O.1PS NO CURRLIM UNO3.txt")
+times3, matrices3, nmax3, nmin3 = load_all_matrices("build/rho_data UNO3 norm.txt")
+times4, matrices4, nmax4, nmin4 = load_all_matrices("build/rho_data UNO3 trap.txt")
+times5, matrices5, nmax5, nmin5 = load_all_matrices("build/rho_data UNO3 RK4.txt")
+
+times6, matrices6, nmax6, nmin6 = load_all_matrices("build/rho_data SOLUTION SP.txt")
+times7, matrices7, nmax7, nmin7 = load_all_matrices("build/rho_data SP norm.txt")
+times8, matrices8, nmax8, nmin8 = load_all_matrices("build/rho_data SP trap.txt")
+times9, matrices9, nmax9, nmin9 = load_all_matrices("build/rho_data SP RK4.txt")
 
 # Set up the figure and axis
-fig, ax = plt.subplots()
-im = ax.imshow(matrices[0],vmin=nmin, vmax=nmax)# cmap='viridis',norm=SymLogNorm(linthresh=1, vmin=-nmin, vmax=nmax))  # vmin=nmin, vmax=nmax,Adjust vmin/vmax as needed
-
-def update(frame):
-    im.set_array(matrices[frame])
-    ax.set_title(f'Time = {times[frame]}')
-    return [im]
-
-# Create an animation
-ani = animation.FuncAnimation(fig, update, frames=len(matrices), blit=True)
-plt.colorbar(im)
-plt.show()
+#fig, ax = plt.subplots()
+#im = ax.imshow(matrices[0],vmin=nmin, vmax=nmax)# cmap='viridis',norm=SymLogNorm(linthresh=1, vmin=-nmin, vmax=nmax))  # vmin=nmin, vmax=nmax,Adjust vmin/vmax as needed
+#
+#def update(frame):
+#    im.set_array(matrices[frame])
+#    ax.set_title(f'Time = {times[frame]}')
+#    return [im]
+#
+## Create an animation
+#ani = animation.FuncAnimation(fig, update, frames=len(matrices), blit=True)
+#plt.colorbar(im)
+#plt.show()
 """
 # Define the two new lists
 list1 = [
@@ -236,7 +404,7 @@ plt.show()
 """
 # Define the two new lists
 list1 = [
-    -8.38742e-021, -9.82901e-022, -1.15184e-022, -1.34981e-023, 
+    -8.38742e-021, -9.82901e-022, -1.15184e-022, -1.34981e-023, s
     -1.58181e-024, -1.85368e-025, -2.17228e-026, -2.54564e-027, 
     -2.98317e-028, -3.49591e-029, -4.09677e-030, -4.8009e-031, 
     -5.62605e-032, -6.59303e-033, -7.72621e-034, -9.05415e-035, 
@@ -288,7 +456,7 @@ plt.legend()
 # Show the plot
 plt.show()
 """
-
+"""
 list1 = [
     -160, -160, -160, -160, -160, -160, -160, -160, -160, -160, 
 -160, -160, -160, -160, -160, -160, -160, -160, -160, -160, 
@@ -312,9 +480,12 @@ list3 = [-3976.09, -14.7546, -0.51802, -0.39366, -0.392561, -0.392551, -0.392551
 sum1 = 0
 sum2 = 0
 """
+"""
 for i in range(len(list1)):
     sum1 += list1[i]
     sum2 += list2[i]
+"""
+
 """
 print(sum1)
 print(sum2)
@@ -338,4 +509,63 @@ plt.legend()
 plt.yscale("log")
 plt.ylim(0,5e3)
 # Show the plot
+plt.show()
+"""
+
+dt_data = np.loadtxt("build/dt_data.txt")
+
+plt.plot(dt_data, linestyle='-', label='Data', lw=2)
+plt.title("Timestep Per iteration")
+plt.xlabel("Iteration")
+plt.ylabel("dt(s)")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+i = 1
+x = np.linspace(0,10,int(i*500))
+x_original = np.linspace(0,10,int(500))
+# FOR UNO3
+plt.plot(x,np.array(matrices[-1][-1][int(i*0):int(i*500)]), color= "black", label="current test", ls = "solid")
+#plt.plot(x,np.array(matrices[-1][-2][int(i*50):int(i*350)]), color= "red", label="current test", ls = "--")
+
+plt.plot(x_original,np.array(matrices2[-1][0][int(0):int(500)]), color= "green", label="sol UNO3", lw= 1)
+#plt.plot(x_original,np.array(matrices3[-1][0][int(i*50):int(i*350)]), color= "blue", label="nor", lw= 1)
+#plt.plot(x_original,np.array(matrices4[-1][0][int(i*50):int(i*350)]), color= "red", label="trap", lw= 1)
+#plt.plot(x_original,np.array(matrices5[-1][0][int(i*50):int(i*350)]), color= "black", label="RK4", lw= 1, ls= "--")
+
+# for SUPERBEE
+#plt.plot(x_original,np.array(matrices6[-1][0][int(i*50):int(i*350)]), color= "black", label="sol SUPERBEE", lw= 1)
+#plt.plot(x_original,np.array(matrices7[-1][0][int(i*50):int(i*350)]), color= "blue", label="nor", lw= 1)
+#plt.plot(x_original,np.array(matrices8[-1][0][int(i*50):int(i*350)]), color= "red", label="trap", lw= 1)
+#plt.plot(x_original,np.array(matrices9[-1][0][int(i*50):int(i*350)]), color= "black", label="RK4", lw= 1, ls= "--")
+plt.legend()
+x = np.linspace(0,10,int(i*500))
+#plt.plot(x,np.array(matrices[-2][0][int(i*50):int(i*350)]))
+#plt.plot(x,np.array(matrices[-3][0][int(i*50):int(i*350)]))
+#plt.plot(x,np.array(matrices[-4][0][int(i*50):int(i*350)]))
+#plt.plot(x,np.array(matrices[-5][0][int(i*50):int(i*350)]))
+#plt.plot(x,np.array(matrices[-6][0][int(i*50):int(i*350)]))
+print(matrices[-1][0])
+
+i = 1
+x = np.linspace(0,10,int(i*500))
+#plt.plot(x,matrices[-1][-1][int(i*50):int(i*350)], color = "red", label="RK4")
+"""
+i = 1
+x = np.linspace(1,7,i*300)
+plt.plot(x,matrices2[-1][0][int(i*50):int(i*350)], color = "green", label="RK4")
+"""
+plt.yscale("log")
+plt.ylim(1e17,1e21)
+plt.grid(True)
+plt.title(r'Density(z)')
+plt.show()
+
+plt.title(r'E(z)')
+plt.grid(True)
+
+plt.plot(x,Ez[int(i*0):int(i*500)])
+#plt.yscale("log")
+#splt.ylim(1e1,1e21)
 plt.show()
