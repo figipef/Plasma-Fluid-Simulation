@@ -89,7 +89,7 @@ Poisson2DCyl::Poisson2DCyl(int n, int m, double dr, double dz, Eigen::VectorXd e
 			double epsj1 = epsj;
 
 			if (j+1 < m){
-				double epsj1 = eps(j+1);//eps_map[(--eps_map.lower_bound(j+1)) -> first];
+				epsj1 = eps(j+1);//eps_map[(--eps_map.lower_bound(j+1)) -> first];
 			}
 
 			if (j < m){
@@ -113,14 +113,10 @@ Poisson2DCyl::Poisson2DCyl(int n, int m, double dr, double dz, Eigen::VectorXd e
 			}
 
 			if (r_size == 1){
-				phic[i][j] = -1*(phiw[i][j] + phie[i][j]);// + phis[i][j] + phin[i][j]);
+				phic[i][j] = -1*(phiw[i][j] + phie[i][j]);
 			} else {
 				phic[i][j] = -1*(phiw[i][j] + phie[i][j] + phis[i][j] + phin[i][j]);
 			}
-			
-			//std::cout << std::fixed << std::setprecision(21);
-			//std::cout <<"PHIC "<<phic[i][j]<< " phie " << phie[i][j] << "phiw " << phiw[i][j]<< "phin " << phin[i][j]<< "phis " << phis[i][j]<< std::endl;
-
 		}	
 	}
 }
@@ -263,7 +259,7 @@ void Poisson2DCyl::solve(double V0, double VMAX, double VWALL, double VIN ,Eigen
     std::cout << "Time taken to Load PHI's (coeffecients): " << d2.count() << " ms" << std::endl;
 }
 
-void Poisson2DCyl::solve_Poisson(int f){
+void Poisson2DCyl::solve_Poisson(){
 
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RHS = Eigen::MatrixXd::Zero(r_size, z_size);
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> HELP = Eigen::MatrixXd::Zero(r_size, z_size);
@@ -273,18 +269,14 @@ void Poisson2DCyl::solve_Poisson(int f){
 	for (int i = 0; i < r_size; i++){
 		for (int j = 0; j < z_size; j++){
 
-			RHS(i,j) = rhs_i(i,j) + rho(i,j) * vols(i,j);// ;// * vols(i,j); // Alterado o RHS pela matrize de volume por verificar !!
+			RHS(i,j) = rhs_i(i,j) + rho(i,j) * vols(i,j);
 		}
 	}
 
 	Eigen::VectorXd b(RHS.size());
     b = Eigen::Map<const Eigen::VectorXd>(RHS.data(), RHS.size());
 
-    //std::cout << b << std::endl;
-
     Eigen::VectorXd v = solver.solve(b);
-
-    //std::cout << v << std::endl;
 
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> V = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(v.data(), r_size, z_size);    
 
@@ -305,11 +297,11 @@ void Poisson2DCyl::solve_Poisson(int f){
 				double epsj1 = eps(j);
 				double epsj2 = eps(j+1);
 
-				//E1_z(i,j) = (- sig(j) * hdz + epsj2*V(i,j) - epsj2*V(i,j+1)) / (epsj1*hdz + epsj2*hdz); 
-				//E2_z(i,j) = (sig(j) * hdz +epsj1*V(i,j) - epsj1*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
+				E1_z(i,j) = (- sig(j) * hdz + epsj2*V(i,j) - epsj2*V(i,j+1)) / (epsj1*hdz + epsj2*hdz); 
+				E2_z(i,j) = (sig(j) * hdz +epsj1*V(i,j) - epsj1*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
 
-				E1_z(i,j) = (V(i,j) - V(i,j+1)) / (z_step); 
-				E2_z(i,j) = (V(i,j) - V(i,j+1)) / (z_step);
+				//E1_z(i,j) = (V(i,j) - V(i,j+1)) / (z_step); 
+				//E2_z(i,j) = (V(i,j) - V(i,j+1)) / (z_step);
 			}
 
 			if ( i < r_size -1){
@@ -322,20 +314,12 @@ void Poisson2DCyl::solve_Poisson(int f){
 	Er = E_r;
 	Ez1 = E1_z;
 	Ez2 = E2_z;
-
-	if (f % 999 == 0){
-		//std::cout<<"finished Poisson"<<std::endl;
-
-	}
 }
 
-void Poisson2DCyl::push_time(int ti, double dt, std::ofstream& file,std::ofstream& dt_file, int  int_mode){
-
-	double ECHARGE = 1.6e-19;
+void Poisson2DCyl::push_time(int ti, double dt,std::ofstream& dt_file, int  int_mode){
 
 	//double mu = 0.03; // To be changed later !!!
 	//double De = 0.1;
-	double alph = 0.0;
 
 	Eigen::MatrixXd mu = Eigen::MatrixXd::Zero(r_size, z_size);
 	Eigen::MatrixXd De = Eigen::MatrixXd::Zero(r_size, z_size);
@@ -366,9 +350,6 @@ void Poisson2DCyl::push_time(int ti, double dt, std::ofstream& file,std::ofstrea
 			Se(i,j) = Pol(x, 2) * 2.43e25 * ne(i,j); 
 		}
 	}
-	std::cout << mu.maxCoeff()<<std::endl;
-	//std::cout<<De<<std::endl;
-	//Eigen::MatrixXd Se = Eigen::MatrixXd::Zero(r_size, z_size); // Source term TO BE CHANGED
 
 	// Calculate Fluxes at each cell
 	
@@ -381,14 +362,11 @@ void Poisson2DCyl::push_time(int ti, double dt, std::ofstream& file,std::ofstrea
 	Eigen::MatrixXd midfluxne = Eigen::MatrixXd::Zero(r_size, z_size);
 	Eigen::MatrixXd midfluxni = Eigen::MatrixXd::Zero(r_size, z_size);
 
-	double vr_max = 0;
+	double vr_max = 1e-308;
 	if ( r_size > 1){
 		vr_max = std::abs(mu.maxCoeff() * Er.maxCoeff());
-	}else {
-		vr_max = 1e-308;
-
 	}
-	//std::cout <<mu<<std::endl;
+
 	double vz_max = std::max({std::abs(mu.maxCoeff() * Ez1.maxCoeff()), std::abs(mu.maxCoeff() * Ez2.maxCoeff()), 1e-308});
 
 	//dt = std::min({0.125 * z_step/vz_max, 0.25* z_step*z_step/De, 0.5 * 8.85e-12/(mu * ne.maxCoeff()* 1.6e-19)});
@@ -414,7 +392,7 @@ void Poisson2DCyl::push_time(int ti, double dt, std::ofstream& file,std::ofstrea
 	
 			for (int j = 0; j < z_size; ++j){ // changed from 0 and z _size to 1 and z_size - 1
 	
-				midfluxne(i,j) =  calcFlux_UNO3(i, j, mu(i,j), De(i,j), dt, ne, alph);
+				midfluxne(i,j) =  calcFlux_UNO3(i, j, mu(i,j), De(i,j), dt, ne);
 	
 				//midfluxni(i,j) = calcFlux(i, j, 0, 0, dt, ni, alph);
 	
@@ -431,7 +409,7 @@ void Poisson2DCyl::push_time(int ti, double dt, std::ofstream& file,std::ofstrea
 	
 			for (int j = 0; j < z_size; ++j){ 
 	
-				midfluxne(i,j) = calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, ne, alph);
+				midfluxne(i,j) = calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, ne);
 	
 				//midfluxni(i,j) = calcFlux_superbee(i, j, 0, 0, dt, ni, alph);
 	
@@ -446,7 +424,7 @@ void Poisson2DCyl::push_time(int ti, double dt, std::ofstream& file,std::ofstrea
 	
 			for (int j = 0; j < z_size; ++j){ // ter atencao n(i,j) * mu
 	
-				new_ne(i,j) = ne(i, j) + dt/2*(midfluxne(i, j) + calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, new_new_ne, alph))/vols(i, j);
+				new_ne(i,j) = ne(i, j) + dt/2*(midfluxne(i, j) + calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, new_new_ne))/vols(i, j);
 
 				//new_ni(i,j) = ni(i, j) + dt/2*(midfluxni(i, j) + calcFlux_superbee(i, j,  0,  0, dt, new_new_ni, alph))/vols(i, j);
 
@@ -470,7 +448,7 @@ void Poisson2DCyl::push_time(int ti, double dt, std::ofstream& file,std::ofstrea
 
 			for (int j = 0; j < z_size; ++j){ 
 	
-				k1(i,j) = calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, ne, alph);
+				k1(i,j) = calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, ne);
 	
 			}
 		}
@@ -481,7 +459,7 @@ void Poisson2DCyl::push_time(int ti, double dt, std::ofstream& file,std::ofstrea
 	
 			for (int j = 0; j < z_size; ++j){ 
 	
-				k2(i,j) = calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, helpk1, alph);
+				k2(i,j) = calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, helpk1);
 	
 			}
 		}
@@ -492,7 +470,7 @@ void Poisson2DCyl::push_time(int ti, double dt, std::ofstream& file,std::ofstrea
 	
 			for (int j = 0; j < z_size; ++j){ 
 	
-				k3(i,j) = calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, helpk2, alph);
+				k3(i,j) = calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, helpk2);
 	
 			}
 		}
@@ -503,7 +481,7 @@ void Poisson2DCyl::push_time(int ti, double dt, std::ofstream& file,std::ofstrea
 	
 			for (int j = 0; j < z_size; ++j){ 
 	
-				k4(i,j) = calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, helpk3, alph);
+				k4(i,j) = calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, helpk3);
 			}
 		}
 		
@@ -519,15 +497,13 @@ void Poisson2DCyl::push_time(int ti, double dt, std::ofstream& file,std::ofstrea
 		}
 	
 	}
-	//std::cout <<"e"<<std::endl;
+
 	ne = new_ne;
 	ni = new_ni;
 
 	t = t+dt;
 
-	//std::cout<< dt<< std::endl;
-
-	solve_Poisson(ti);
+	solve_Poisson();
 
 	write_dt(dt_file, dt);
 
@@ -537,7 +513,6 @@ void Poisson2DCyl::push_time(int ti, double dt, std::ofstream& file,std::ofstrea
 
 		std::cout << " t = "<<t<<std::endl;
 		std::cout << " dt =" <<dt<<std::endl;
-		//write_dens(file);
 	}	
 }
 
@@ -658,7 +633,6 @@ double Poisson2DCyl::calculate_g_c(double g_dc, double g_cu, double u, double dx
 	//return std::copysign(1.0, g_dc)*2*(std::abs(g_dc * g_cu)/(std::abs(g_dc) + std::abs(g_cu)+ 1e-308));
 }
 
-
 double Poisson2DCyl::calculate_g_c_UNO2(double g_dc, double g_cu){
 
 	return std::copysign(1.0, g_dc)*2*(std::abs(g_dc * g_cu)/(std::abs(g_dc) + std::abs(g_cu)+ 1e-308));
@@ -672,234 +646,8 @@ double Poisson2DCyl::phia(double x){
 double Poisson2DCyl::korenLimiter(double x){
 	return std::max(0., std::min({1.0, (2.0+x)/6.0 , x}));
 }
-/*
-double Poisson2DCyl::calcFlux(int i , int j ,double mu, double De, double dt, Eigen::MatrixXd& n, double alpha){
-	
-	double EPS0 = 8.85418781762e-12;
-	double ECHARGE = 1.6e-19;
 
-	double f_S = 0.0;
-	double f_N = 0.0;
-	double f_E = 0.0;
-	double f_W = 0.0;
-
-	double e_N = 0.0;
-	double e_S = 0.0;
-	double e_E = 0.0;
-	double e_W = 0.0;
-
-	double g_cu = 0.0;
-	double g_dc = 0.0;
-	double g_c = 0.0;
-	double mf = 0.0;
-
-	std::string mode = "UNO3";
-
-	int currlim = 1;
-
-	if (i == 0){
-		f_S = 0.0;
-	} else {
-		//f_S(i,j) = -(ne(i,j) * mu * Er(i - 1,j) - De * (ne(i,j) - ne(i - 1, j)) / r_step) * S_vert(i - 1,j);
-		f_S = 0.0;
-	}
-	if (i == r_size - 1){
-		f_N = 0.0;
-	} else {
-		//f_N(i,j) = (-ne(i,j) * mu * Er(i,j) - De * (ne(i + 1,j) - ne(i, j)) / r_step) * S_vert(i,j); 
-		f_N = 0.0;
-	}
-
-	// Handle f_E calculations
-	//std::cout<<j<<std::endl;
-	if (j == z_size - 1){
-		f_E = 0.0;
-		//f_E = (-n(i,j) * mu * Ez1(i, j-1) - De * (0 - n(i, j)) / z_step) * S_hori(i, j);
-
-	} else {
-		//double v = -mu*Ez1(i,j);
-		if (-Ez1(i, j)*mu >= 0.) {
-		//if (v > 0) {
-			g_dc = (n(i, j + 1) - n(i, j))/z_step;
-			if ( j == 0){
-				g_cu = (n(i, j) - 0.0)/z_step;
-				//g_cu = 0;
-				if(mode == "Teunissen"){
-
-					//mf = ne(i,j) + phia(0)*(ne(i,j+1)-ne(i,j));
-				} else if (mode == "Superbee"){
-					mf = n(i,j) + 0.5 * (1.0 - dt*(-Ez1(i, j)*mu)/z_step) *phia(0.0)*(n(i,j+1)-n(i,j));
-				}
-				
-			} else {
-				g_cu = (n(i, j) - n(i, j - 1))/z_step;
-
-				if(mode == "Teunissen"){
-
-					mf = n(i,j) + phia((n(i,j) - n(i, j - 1))/(n(i,j + 1) - n(i,j) + 1e-308))*(n(i,j+1)-n(i,j));
-				} else if (mode == "Superbee"){
-					mf = n(i,j) + 0.5 * (1.0 - dt*(-Ez1(i, j)*mu)/z_step) *phia((n(i,j) - n(i, j - 1))/(n(i,j + 1) - n(i,j) + 1e-308))*(n(i,j+1)-n(i,j));
-
-				}
-			}
-		    
-
-		    if (mode == "UNO3"){
-		    	g_c = calculate_g_c(g_dc, g_cu,-mu * Ez1(i,j), z_step, dt);
-		    	mf = midWayFlux(n(i,j), -mu * Ez1(i,j), z_step, dt, g_c);
-		    }
-
-		} else {
-
-			if (j == z_size - 2) {
-				g_dc = -1.0*(n(i, j) - n(i, j + 1))/z_step;
-	    		g_cu = -1.0*(n(i, j + 1) - 0)/z_step;
-				//g_cu = 0;
-
-				if (mode == "Teunissen"){
-
-					mf = n(i,j+1) + phia(0)*(n(i,j+1)-n(i,j));
-				} else if (mode == "Superbee"){
-					mf = n(i,j+1) + 0.5 * (1.0 - dt*(-Ez1(i, j)*mu)/z_step) *phia(0)*(n(i,j+1)-n(i,j));
-				
-				}
-
-			} else {
-				g_dc = (n(i, j) - n(i, j + 1))/z_step;
-	    		g_cu = (n(i, j + 1) - n(i, j + 2))/z_step;
-
-	    		if (mode == "Teunissen"){
-
-	    			mf = n(i,j+1) + phia((n(i,j+2) - n(i, j + 1))/(n(i,j + 1) - n(i,j) + 1e-308))*(n(i,j+1)-n(i,j));
-	    		} else if (mode == "Superbee"){
-	    			mf = n(i,j+1) + 0.5 * (1 - dt*(-Ez1(i, j)*mu)/z_step) *phia((n(i,j+2) - n(i, j + 1))/(n(i,j + 1) - n(i,j) + 1e-308))*(n(i,j+1)-n(i,j));
-
-	    		}
-			}
-			
-			if (mode == "UNO3"){
-				g_c = calculate_g_c(g_dc, g_cu, -mu * Ez1(i,j), z_step, dt);
-				mf = midWayFlux(n(i,j + 1), - mu * Ez1(i,j), z_step, dt, g_c);
-			
-			}
-		}
-
-		f_E = (-mf * mu * Ez1(i, j) - De * (n(i, j + 1) - n(i, j)) / z_step) * S_hori(i, j);
-
-	}
-	// Handle f_W calculations
-	g_cu = 0;
-	g_dc = 0;
-	g_c = 0;
-	mf = 0;
-
-	if (j == 0){
-
-		f_W = 0;
-		//f_W = (-n(i,j) * mu * Ez1(i, j) - De * (n(i, j) - 0) / z_step) * S_hori(i, j);
-
-	} else {
-		//double v = -mu*Ez1(i,j-1);
-		if (-Ez1(i, j - 1)*mu > 0.) {
-		//if (v > 0) {
-			if (j == 1) {
-				g_dc = (n(i, j) - n(i, j - 1))/z_step;
-	    		g_cu = (n(i, j - 1) - 0)/z_step;
-				//g_cu = 0;
-				if (mode == "Teunissen"){
-					mf = n(i,j-1) + phia(0)*(n(i,j)-n(i,j-1));
-				} else if (mode == "Superbee"){
-					mf = n(i,j-1) + 0.5 * (1 - dt*(-Ez1(i, j-1)*mu)/z_step) *phia(0)*(n(i,j)-n(i,j-1));
-
-				}
-			} else {
-				g_dc = (n(i, j) - n(i, j - 1))/z_step;
-	    		g_cu = (n(i, j - 1) - n(i, j - 2))/z_step;
-				if (mode == "Teunissen"){
-					mf = n(i,j-1) + phia((n(i,j-1) - n(i, j - 2))/(n(i,j) - n(i,j-1) + 1e-308))*(n(i,j)-n(i,j-1));
-				} else if (mode == "Superbee"){
-					mf = n(i,j-1) + 0.5 * (1 - dt*(-Ez1(i, j-1)*mu)/z_step) *phia((n(i,j-1) - n(i, j - 2))/(n(i,j) - ne(i,j-1) + 1e-308))*(n(i,j)-n(i,j-1));
-
-				}			
-			}
-
-		    
-			if (mode == "UNO3"){
-				g_c = calculate_g_c(g_dc, g_cu, -mu * Ez1(i,j - 1), z_step, dt);
-				mf = midWayFlux(n(i,j - 1), -mu * Ez1(i,j - 1), z_step, dt, g_c);
-			}
-
-		} else if(-Ez1(i,j-1)*mu == 0){
-
-			mf = 0;
-
-		} else {
-
-			if ( j == z_size - 1){
-				g_cu = (n(i, j) - 0)/z_step;
-				//g_cu = 0;
-				if (mode == "Teunissen"){
-					mf = n(i,j) + phia(0)*(n(i,j)-n(i,j-1));
-				} else if (mode == "Superbee"){
-					mf = n(i,j) + 0.5 * (1 - dt*(-Ez1(i, j-1)*mu)/z_step) *phia(0)*(n(i,j)-n(i,j-1));
-
-				}
-
-			} else {
-				g_cu = (n(i, j) - n(i, j + 1))/z_step;
-
-				if (mode == "Teunissen"){
-					mf = n(i,j) + phia((n(i,j+1) - n(i, j))/(n(i,j) - n(i,j-1) + 1e-308))*(n(i,j)-n(i,j-1));
-				} else if (mode == "Superbee"){
-					mf = n(i,j) + 0.5 * (1 - dt*(-Ez1(i, j-1)*mu)/z_step) *phia((n(i,j+1) - n(i, j))/(n(i,j) - n(i,j-1) + 1e-308))*(n(i,j)-n(i,j-1));
-
-				}
-			}
-			g_dc = (n(i, j - 1) - n(i, j))/z_step;
-	    	
-			
-			if (mode == "UNO3"){
-				g_c = calculate_g_c(g_dc, g_cu, -mu * Ez1(i,j - 1), z_step, dt);
-				mf = midWayFlux(n(i,j), - mu * Ez1(i,j - 1), z_step, dt, g_c);
-			}
-			
-		}
-
-		f_W = (-mf * mu * Ez1(i, j - 1) - De * (n(i, j) - n(i, j - 1)) / z_step) * S_hori(i, j - 1);
-	}
-	
-	if ( currlim == 1) {
-
-		if (j >= 0 && j < z_size - 2 && mu != 0){
-			e_E = std::max(std::abs(Ez1(i,j)), De * std::abs(n(i,j+1) - n(i,j))/(mu * z_step * std::max({n(i,j+1), n(i,j),1e-308})));
-	
-		} else if (j == z_size - 2 && mu != 0) {
-			e_E = Ez1(i,j);
-		}
-	
-		if (j > 0 && j <= z_size - 1 && mu != 0){
-			e_W = std::max(std::abs(Ez1(i,j - 1)), De * std::abs(n(i,j) - n(i,j - 1))/(mu*z_step*std::max({n(i,j), n(i,j - 1),1e-308})));
-	
-		} else if (j == 0 && mu != 0) {
-			e_W = Ez1(i,j);
-		}
-	
-		if (std::abs(f_E) > EPS0 * std::abs(e_E)/(dt * ECHARGE) && mu != 0){
-			f_E = getSign(f_E, 0) * EPS0 * e_E/(dt * ECHARGE);
-		}
-	
-		if (std::abs(f_W) > EPS0 * std::abs(e_W)/(dt * ECHARGE) && mu != 0){
-			f_W = getSign(f_W, 0) * EPS0 * e_W/(dt * ECHARGE);
-		}
-	}
-	
-	//std::cout <<f_W<<std::endl;
-
-	return (f_W - f_E);// + f_S - f_N) / vols(i, j) + alpha * (std::abs(f_W) + std::abs(f_N) +std::abs(f_S) +std::abs(f_E))/4; // Trocar para 4 quando for a 4 dimensoes
-}
-*/
-
-double Poisson2DCyl::calcFlux_superbee(int i , int j ,double mu, double De, double dt, Eigen::MatrixXd& n, double alpha){
+double Poisson2DCyl::calcFlux_superbee(int i , int j ,double mu, double De, double dt, Eigen::MatrixXd& n){
 	int currlim = 1;
 	double EPS0 = 8.85418781762e-12;
 	double ECHARGE = 1.6e-19;
@@ -1038,7 +786,7 @@ double Poisson2DCyl::calcFlux_superbee(int i , int j ,double mu, double De, doub
     return flux_left - flux_right;    
 }
 
-double Poisson2DCyl::calcFlux_UNO3(int i , int j ,double mu, double De, double dt, Eigen::MatrixXd& n, double alpha){
+double Poisson2DCyl::calcFlux_UNO3(int i , int j ,double mu, double De, double dt, Eigen::MatrixXd& n){
 	int currlim = 1;
 	double EPS0 = 8.85418781762e-12;
 	double ECHARGE = 1.6e-19;
@@ -1136,7 +884,6 @@ double Poisson2DCyl::calcFlux_UNO3(int i , int j ,double mu, double De, double d
 			g_dc = (n(i, j + 1) - n(i, j))/z_step;
 			g_cu = (n(i, j) - n(i, j - 1))/z_step;
 
-			//G_P = calculate_g_c(G_EP, G_PW, ve, z_step, dt);
 			g_c = calculate_g_c(g_dc, g_cu, ve, z_step, dt);
 		    nem = n(i,j) + 0.5 * std::copysign(1.0, ve) * (z_step - std::abs(ve) * dt) * g_c;
 
@@ -1152,7 +899,6 @@ double Poisson2DCyl::calcFlux_UNO3(int i , int j ,double mu, double De, double d
 				g_cu = -1.0 *(n(i, j + 1) - n(i, j + 2))/z_step;
 			}
 	    	
-		    //G_E = calculate_g_c(G_PE, G_EE, ve, z_step, dt);
 		    g_c = calculate_g_c(g_dc, g_cu, ve, z_step, dt);
 
 		    nem = n(i,j+1) +  0.5 * std::copysign(1.0, ve) * (z_step - std::abs(ve) * dt) * g_c;
@@ -1170,7 +916,6 @@ double Poisson2DCyl::calcFlux_UNO3(int i , int j ,double mu, double De, double d
 				g_cu = (n(i, j - 1) - n(i, j - 2))/z_step;
 			}
 
-	    	//G_W = calculate_g_c(G_PW, G_WW, vw, z_step, dt);
 		    g_c = calculate_g_c(g_dc, g_cu, vw, z_step, dt);
 		    nw = n(i,j-1) + 0.5 * std::copysign(1.0, vw) * (z_step - std::abs(vw) * dt) * g_c;
 
@@ -1180,11 +925,8 @@ double Poisson2DCyl::calcFlux_UNO3(int i , int j ,double mu, double De, double d
 			g_cu = -1.0 * (n(i, j) - n(i, j + 1))/z_step;
 			g_dc = -1.0 * (n(i, j - 1) - n(i, j))/z_step;
 
-		    //G_A = calculate_g_c(G_WP, G_PE, vw, z_step, dt);
 		    g_c = calculate_g_c(g_dc, g_cu, vw, z_step, dt);
 		    nw = n(i,j) + 0.5 * std::copysign(1.0, vw) * (z_step - std::abs(vw) * dt) * g_c;
-
-		    //std::cout<< G_A<< " " << calculate_g_c_UNO2(G_WP,G_PE) << std::endl;
 		}
 
 		// Compute fluxes
@@ -1214,7 +956,7 @@ double Poisson2DCyl::calcFlux_UNO3(int i , int j ,double mu, double De, double d
     return (flux_left - flux_right)*S_hori(i,j);
 }
 
-double Poisson2DCyl::calcFlux_Koren(int i , int j ,double mu, double De, double dt, Eigen::MatrixXd& n, double alpha){
+double Poisson2DCyl::calcFlux_Koren(int i , int j ,double mu, double De, double dt, Eigen::MatrixXd& n){
 	int currlim = 1;
 	double EPS0 = 8.85418781762e-12;
 	double ECHARGE = 1.6e-19;

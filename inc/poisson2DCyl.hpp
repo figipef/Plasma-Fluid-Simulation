@@ -78,9 +78,9 @@ class Poisson2DCyl{
 
 		void solve(double, double, double, double ,Eigen::MatrixXd, Eigen::MatrixXd, double[4]);
 
-		void solve_Poisson(int);
+		void solve_Poisson();
 
-		void push_time(int, double, std::ofstream&,std::ofstream&, int);
+		void push_time(int, double,std::ofstream&, int);
 
 		void calculate_charge_density();
 
@@ -108,11 +108,11 @@ class Poisson2DCyl{
 
 		double calcFlux(int, int, double, double, double, Eigen::MatrixXd&, double);
 
-		double calcFlux_superbee(int, int, double, double, double, Eigen::MatrixXd&, double);
+		double calcFlux_superbee(int, int, double, double, double, Eigen::MatrixXd&);
 
-		double calcFlux_UNO3(int , int ,double, double, double, Eigen::MatrixXd&, double);
+		double calcFlux_UNO3(int , int ,double, double, double, Eigen::MatrixXd&);
 
-		double calcFlux_Koren(int, int, double, double, double, Eigen::MatrixXd&, double);
+		double calcFlux_Koren(int, int, double, double, double, Eigen::MatrixXd&);
 
 		double Pol(double, int);
 

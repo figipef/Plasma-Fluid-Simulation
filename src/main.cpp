@@ -1,6 +1,8 @@
 #include "placeholder.hpp"
 #include "poisson1DCart.hpp"
 #include "poisson2DCyl.hpp"
+#include "specie.hpp"
+#include "chemistry.hpp"
 
 #include <cmath>
 #include <vector>
@@ -14,34 +16,6 @@
 double epsi =8.85418781762e-12;
 
 double no_epsi = 1;
-/*
-double ZERO(double x){
-    x=1;
-    return 0;
-}
-
-double constant(double x){
-    x=1;
-    return 1 * epsi;
-}
-
-double ZERO2D(double r, double z){
-    r=1;
-    z = 2;
-    return 0;
-}
-
-double CONST2D(double r, double z){
-    r=1;
-    z = 2;
-    return 0.0001 * epsi;
-}
-
-double jan(double r, double z){
-    return (6 - 4 * r* r - 4*z*z)*exp(-r*r -z*z);
-}
-
-*/
 
 // Function to perform polynomial fitting
 Eigen::VectorXd polynomialFit(const std::vector<double>& x, const std::vector<double>& y, int degree, bool type) {
@@ -94,17 +68,6 @@ int main() {
 
     Eigen::VectorXd eps = Eigen::VectorXd::Constant(size_z, epsi);
     Eigen::VectorXd sig = Eigen::VectorXd::Constant(size_z, 0);
-
-    //Poisson1DCart testPoisson1D(12, 1, 0.);
-
-    //testPoisson1D.dirichlet(10, false, false, 0, 10.0, &ZERO);
-
-    //testPoisson1D.dirichlet(5, false, false, 0, 10.0, &constant);
-
-    //testPoisson1D.dirichlet(5, true, false, 0, 10.0, &constant);
-
-    //testPoisson1D.dirichlet(5, true, true, 0, 10, &constant);
-
 
     // =======
     // Convection schemes Testing
@@ -184,7 +147,7 @@ int main() {
     
     testPoisson2D.solve(40e3,0,0,0, ne,ni, fronteira_livre);
 
-    testPoisson2D.solve_Poisson(0);
+    testPoisson2D.solve_Poisson();
 
     testPoisson2D.write_fields("i");
     testPoisson2D.write_dens(file); 
@@ -201,7 +164,7 @@ int main() {
     //while (testPoisson2D.t <= 0) {     //
     auto start = std::chrono::high_resolution_clock::now();
     while (testPoisson2D.t <= 5e-9) {
-        testPoisson2D.push_time(i ,8e-14,file,dt_file, 0);
+        testPoisson2D.push_time(i ,8e-14,dt_file, 0);
         i++;
 
     }
