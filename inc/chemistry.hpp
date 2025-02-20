@@ -7,7 +7,7 @@ class chemistry{
 
 	public:
 
-		chemistry(int n_species, int n_reactions, );
+		chemistry(int n_species, int n_reactions);
 
 		double calc_reaction_rate();
 
@@ -19,4 +19,4 @@ class chemistry{
 
 		int **species_react_net; // For each species (i) save the net gain/loss for each reaction (j)
 
-}
+};

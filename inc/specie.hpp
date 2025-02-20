@@ -4,11 +4,11 @@
 
 double const E_CHARGE = 1.6e-19;
 
-class specie{
+class Specie{
 
 	public:
 
-		specie(std::string, int, double, int*);
+		Specie(std::string, int, double, int*);
 
 		std::string get_name();
 

@@ -314,7 +314,7 @@ void Poisson2DCyl::solve_Poisson(){
 	Er = E_r;
 	Ez1 = E1_z;
 	Ez2 = E2_z;
-}
+}	
 
 void Poisson2DCyl::push_time(int ti, double dt,std::ofstream& dt_file, int  int_mode){
 

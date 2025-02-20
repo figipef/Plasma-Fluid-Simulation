@@ -3,6 +3,8 @@
 #include "poisson2DCyl.hpp"
 #include "specie.hpp"
 #include "chemistry.hpp"
+#include "simulation.hpp"
+
 
 #include <cmath>
 #include <vector>
