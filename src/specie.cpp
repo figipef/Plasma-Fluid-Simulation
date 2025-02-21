@@ -1,5 +1,9 @@
 #include "specie.hpp"
 
+Specie::Specie() {
+    // Default constructor definition
+}
+
 Specie::Specie(std::string _name, int _charge, double _mass, int* _react_net){
 	name = _name;
 	charge = _charge;

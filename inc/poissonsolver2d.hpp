@@ -1,7 +1,12 @@
 #pragma once
 
-#include <Eigen/Dense>
+#include "simulation.hpp"
+
+#include <vector>
 #include <chrono>
+#include <Eigen/Dense>
+#include <Eigen/Sparse>
+#include <iostream>
 
 class PoissonSolver2D{
 
@@ -9,10 +14,19 @@ class PoissonSolver2D{
 	
 		PoissonSolver2D();
 
-		PoissonSolver2D(double V0, double VMAX, double VWALL, double VIN ,double[4], Eigen::VectorXd, Eigen::VectorXd);
+		PoissonSolver2D(double V0, double VMAX, double VWALL, double VIN ,double[4], Eigen::VectorXd, Simulation);
+
+		void solve();
 
 	private:
 
-		double rhs_i;
+		// Variables for the initialization of the Solver
+		Simulation simul;
+
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> rhs_i;
+		Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
+		Eigen::VectorXd sig;
+
+		//Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
 	
 };

@@ -4,6 +4,7 @@
 #include "specie.hpp"
 #include "chemistry.hpp"
 #include "simulation.hpp"
+#include "poissonsolver2d.hpp"
 
 
 #include <cmath>

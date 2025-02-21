@@ -1,6 +1,25 @@
 #include "poissonsolver2d.hpp"
+#include "simulation.hpp"
 
-PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VIN ,double fronteira[4], Eigen::VectorXd eps, Eigen::VectorXd sig){
+PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VIN ,double fronteira[4], Eigen::VectorXd _sig, Simulation _simul){
+
+	// Set up all variables necessary from simul
+
+	simul = _simul;
+	sig = _sig;
+
+	int r_size = simul.get_r_size();
+	int z_size = simul.get_z_size();
+
+	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> S_hori = simul.get_s_hori();
+
+	Eigen::Vector<double, Eigen::Dynamic> eps = simul.get_eps();
+
+	double **phie = _simul.get_phie();
+	double **phiw = _simul.get_phiw();
+	double **phic = _simul.get_phic();
+	double **phin = _simul.get_phin();
+	double **phis = _simul.get_phis();
 
 	auto start = std::chrono::high_resolution_clock::now();
 
@@ -110,8 +129,6 @@ PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VI
 	Eigen::SparseMatrix<double> PHI(r_size * z_size, r_size * z_size);
 	PHI.setFromTriplets(triplets.begin(), triplets.end());
 
-	phi = PHI;
-
 	solver.analyzePattern(PHI);
 
     solver.factorize(PHI);
@@ -121,6 +138,70 @@ PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VI
 	std::chrono::duration<double, std::milli> d2 = t2 - t1;
     
     std::cout << "Time taken to Load PHI's (coeffecients): " << d2.count() << " ms" << std::endl;
-
 }
 
+void PoissonSolver2D::solve(){
+
+	int r_size = simul.get_r_size();
+	int z_size = simul.get_z_size();
+
+	double r_step = simul.get_dr();
+	double z_step = simul.get_dz();
+
+	Eigen::Vector<double, Eigen::Dynamic> eps = simul.get_eps();
+
+	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RHS = Eigen::MatrixXd::Zero(r_size, z_size);
+	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> rho = simul.get_rho();
+	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> vols = simul.get_vols();
+
+	//calculate_charge_density();
+
+	for (int i = 0; i < r_size; i++){
+		for (int j = 0; j < z_size; j++){
+
+			RHS(i,j) = rhs_i(i,j) + rho(i,j) * vols(i,j);
+		}
+	}
+
+	Eigen::VectorXd b(RHS.size());
+    b = Eigen::Map<const Eigen::VectorXd>(RHS.data(), RHS.size());
+
+    Eigen::VectorXd v = solver.solve(b);
+
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> V = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(v.data(), r_size, z_size);    
+
+    // Calculo de Campo Elétrico
+
+    Eigen::MatrixXd E_r(r_size-1, z_size);
+    Eigen::MatrixXd E1_z(r_size, z_size - 1);
+    Eigen::MatrixXd E2_z(r_size, z_size - 1);
+
+	double hdz = z_step/2;
+
+	for (int i = 0; i < r_size; i++) {
+		
+		for (int j = 0; j <  z_size; j++){
+
+			if (j < z_size - 1){
+
+				double epsj1 = eps(j);
+				double epsj2 = eps(j+1);
+
+				E1_z(i,j) = (- sig(j) * hdz + epsj2*V(i,j) - epsj2*V(i,j+1)) / (epsj1*hdz + epsj2*hdz); 
+				E2_z(i,j) = (sig(j) * hdz +epsj1*V(i,j) - epsj1*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
+
+				//E1_z(i,j) = (V(i,j) - V(i,j+1)) / (z_step); 
+				//E2_z(i,j) = (V(i,j) - V(i,j+1)) / (z_step);
+			}
+
+			if ( i < r_size -1){
+				E_r(i,j) = (V(i,j) - V(i+1,j)) / (r_step);
+			} 
+		}
+	}
+
+	simul.set_potential(V);
+	simul.set_Er(E_r);
+	simul.set_Ez1(E1_z);
+	simul.set_Ez2(E2_z);
+}
