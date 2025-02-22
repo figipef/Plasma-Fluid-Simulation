@@ -5,23 +5,29 @@
 #include <string>
 #include <cmath>
 #include <iostream>
+#include <fstream>
+#include <vector>
 #include <Eigen/Dense>
 
 class Simulation{
 
 	public:
 
-		Simulation(); // Default constructor
+		Simulation(std::vector<Specie>&); // Default constructor
 
-		Simulation(int, double);
+		Simulation(int, double, std::vector<Specie>&);
 
-		Simulation(int, double, Eigen::VectorXd);
+		Simulation(int, double, Eigen::VectorXd,std::vector<Specie>&);
 
-		Simulation(int, int, double, double); // Constructor with only grid and Dieletric
+		Simulation(int, int, double, double, std::vector<Specie>&); // Constructor with only grid and Dieletric 
 
-		Simulation(int, int, double, double, std::string, Eigen::VectorXd); // Constructor with only grid and Dieletric
+		Simulation(int, int, double, double, std::string, Eigen::VectorXd&, std::vector<Specie>&); // Constructor with grid, Dieletric and Species
 
 		void update_charge_density();
+
+		void push_time(int);
+
+		void write_dens(std::ofstream&);
 
 		void set_grid1D(int, double);
 		
@@ -29,17 +35,19 @@ class Simulation{
 
 		void set_dieletric(Eigen::VectorXd);
 
-		void set_species(Specie);
+		void set_species(std::vector<Specie>);
 
 		void set_geometry(std::string);
 
-		void set_potential(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>);
+		void set_potential(const Eigen::MatrixXd& a);
 
-		void set_Er(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>);
+		void set_Er(const Eigen::MatrixXd& a);
 
-		void set_Ez1(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>);
+		void set_Ez1(const Eigen::MatrixXd& a);
 
-		void set_Ez2(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>);
+		void set_Ez2(const Eigen::MatrixXd& a);
+
+		double get_t();
 
 		int get_r_size();
 		int get_z_size();
@@ -49,7 +57,6 @@ class Simulation{
 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> get_s_hori();
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> get_vols();
-
 
 		Eigen::Vector<double, Eigen::Dynamic> get_eps();
 
@@ -61,7 +68,12 @@ class Simulation{
 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> get_rho();
 
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> get_Ez1();
+
 	private:
+
+		// Time
+		double t;
 
 		// Grid size
 		int r_size;
@@ -83,7 +95,7 @@ class Simulation{
 		std::string geometry;
 
 		// Species included in the Simulation
-		Specie species;
+		std::vector<Specie>& species;
 
 		// Grid real values
 

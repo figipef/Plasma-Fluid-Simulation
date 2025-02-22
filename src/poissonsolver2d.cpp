@@ -1,15 +1,15 @@
 #include "poissonsolver2d.hpp"
 #include "simulation.hpp"
 
-PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VIN ,double fronteira[4], Eigen::VectorXd _sig, Simulation _simul){
+PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VIN ,double fronteira[4], Eigen::VectorXd& _sig, Simulation& _simul) : simul(_simul){
 
 	// Set up all variables necessary from simul
 
-	simul = _simul;
+	//simul = _simul;
 	sig = _sig;
 
 	int r_size = simul.get_r_size();
-	int z_size = simul.get_z_size();
+	int z_size = simul.get_z_size(); 
 
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> S_hori = simul.get_s_hori();
 
@@ -127,7 +127,7 @@ PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VI
 	}
 
 	Eigen::SparseMatrix<double> PHI(r_size * z_size, r_size * z_size);
-	PHI.setFromTriplets(triplets.begin(), triplets.end());
+	PHI.setFromTriplets(triplets.begin(), triplets.end()); 
 
 	solver.analyzePattern(PHI);
 
@@ -141,6 +141,8 @@ PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VI
 }
 
 void PoissonSolver2D::solve(){
+
+	simul.update_charge_density();
 
 	int r_size = simul.get_r_size();
 	int z_size = simul.get_z_size();
@@ -199,9 +201,8 @@ void PoissonSolver2D::solve(){
 			} 
 		}
 	}
-
 	simul.set_potential(V);
-	simul.set_Er(E_r);
+	simul.set_Er(E_r); 
 	simul.set_Ez1(E1_z);
 	simul.set_Ez2(E2_z);
 }

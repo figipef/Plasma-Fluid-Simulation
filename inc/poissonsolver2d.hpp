@@ -14,14 +14,14 @@ class PoissonSolver2D{
 	
 		PoissonSolver2D();
 
-		PoissonSolver2D(double V0, double VMAX, double VWALL, double VIN ,double[4], Eigen::VectorXd, Simulation);
+		PoissonSolver2D(double, double, double, double, double[4], Eigen::VectorXd&, Simulation&); 
 
 		void solve();
 
 	private:
 
 		// Variables for the initialization of the Solver
-		Simulation simul;
+		Simulation& simul;
 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> rhs_i;
 		Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;

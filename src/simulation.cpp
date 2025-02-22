@@ -1,18 +1,19 @@
 #define _USE_MATH_DEFINES
 
 #include "simulation.hpp"
+#include "convection.hpp"
 #include "specie.hpp"
 
-Simulation::Simulation(){	
+Simulation::Simulation(std::vector<Specie>& _species) : species(_species){	
 }
 
-Simulation::Simulation(int n, double dz){
+Simulation::Simulation(int n, double dz, std::vector<Specie>& _species) : species(_species){
 	// IN WORK
 	z_size = n;
 	z_step = dz;
 }
 
-Simulation::Simulation(int n, double dz, Eigen::VectorXd _eps){
+Simulation::Simulation(int n, double dz, Eigen::VectorXd _eps, std::vector<Specie>& _species) : species(_species){
 	// IN WORK
 
 	z_size = n;
@@ -20,7 +21,7 @@ Simulation::Simulation(int n, double dz, Eigen::VectorXd _eps){
 	eps = _eps;
 }
 
-Simulation::Simulation(int n, int m, double dr, double dz){
+Simulation::Simulation(int n, int m, double dr, double dz, std::vector<Specie>& _species) : species(_species){
 	// IN WORK
 
 	r_size = n;
@@ -29,7 +30,9 @@ Simulation::Simulation(int n, int m, double dr, double dz){
 	z_step = dz;
 }
 
-Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Eigen::VectorXd _eps){
+Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Eigen::VectorXd& _eps, std::vector<Specie>& _species) : species(_species){
+ 
+	t = 0;
 
 	r_size = n;
 	z_size = m;
@@ -37,6 +40,12 @@ Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Ei
 	z_step = dz;
 	eps = _eps;
 	geometry = _geom;
+	//species = _species;
+
+	S_hori = Eigen::MatrixXd::Zero(r_size, z_size);
+	S_vert = Eigen::MatrixXd::Zero(r_size, z_size);
+	vols = Eigen::MatrixXd::Zero(r_size, z_size);
+	rho = Eigen::MatrixXd::Zero(r_size, z_size);
 
 	// Dynamically allocate an array of size n
 
@@ -140,13 +149,249 @@ Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Ei
 			} else {
 				phic[i][j] = -1*(phiw[i][j] + phie[i][j] + phis[i][j] + phin[i][j]);
 			}
-		}	
+		}
 	}
+	std::cout <<"Initalized Class Simulation"<<std::endl;
 }
 
 void Simulation::update_charge_density(){
 	// PLACEHOLDER
 	rho = Eigen::MatrixXd::Zero(r_size, z_size);
+
+	for (Specie s : species){
+		rho = rho + s.get_density() * s.get_charge() * 1.6e-19; // Can be optimized if the real value of charge is saved in Specie
+	}
+}
+
+void Simulation::push_time(int int_mode){
+
+	//double mu = 0.03; // To be changed later !!!
+	//double De = 0.1;
+	Convection conv(z_step, z_size, S_hori, ez1);
+	double dt;
+
+	Eigen::MatrixXd mu = Eigen::MatrixXd::Zero(r_size, z_size);
+	Eigen::MatrixXd De = Eigen::MatrixXd::Zero(r_size, z_size);
+	Eigen::MatrixXd Se = Eigen::MatrixXd::Zero(r_size, z_size);
+
+	//std::cout <<Ez1<<std::endl;
+
+	for (int i = 0; i < r_size; i++){
+	
+		for (int j = 0; j < z_size; ++j){ 
+			/*
+			double x;
+			
+			if (j == 0){
+				x = std::abs(Ez1(i,j) / (2.43e25) * 1e21);
+			}else if (j == z_size - 1){
+				x = std::abs(Ez1(i,j-1) / (2.43e25) * 1e21);
+			}else{
+				x = std::abs((Ez1(i,j) + Ez1(i,j-1))/2 / (2.43e25) * 1e21);
+			}
+
+			
+
+			mu(i,j) = Pol(x, 0)/2.43e25;
+
+			De(i,j) = Pol(x, 1)/2.43e25; 
+
+			Se(i,j) = Pol(x, 2) * 2.43e25 * ne(i,j); 
+			*/
+			mu(i,j) = 0.03;
+			De(i,j) = 0.1;
+		}
+	}
+	
+	// Calculate Fluxes at each cell
+	
+	Eigen::MatrixXd new_ne = Eigen::MatrixXd::Zero(r_size, z_size);
+	Eigen::MatrixXd new_ni = Eigen::MatrixXd::Zero(r_size, z_size);
+
+	Eigen::MatrixXd new_new_ne = Eigen::MatrixXd::Zero(r_size, z_size);
+	Eigen::MatrixXd new_new_ni = Eigen::MatrixXd::Zero(r_size, z_size);
+
+	Eigen::MatrixXd midfluxne = Eigen::MatrixXd::Zero(r_size, z_size);
+	Eigen::MatrixXd midfluxni = Eigen::MatrixXd::Zero(r_size, z_size);
+
+	double vr_max = 1e-308;
+	if ( r_size > 1){
+		vr_max = std::abs(mu.maxCoeff() * er.maxCoeff());
+	}
+
+	double vz_max = std::max({std::abs(mu.maxCoeff() * ez1.maxCoeff()), std::abs(mu.maxCoeff() * ez2.maxCoeff()), 1e-308});
+
+	//dt = std::min({0.125 * z_step/vz_max, 0.25* z_step*z_step/De, 0.5 * 8.85e-12/(mu * ne.maxCoeff()* 1.6e-19)});
+	
+	double A_cvt = 0.1;
+	double A_dif = 0.1;
+
+	if (r_size == 1){
+	
+		dt = std::min({A_cvt * z_step/(vz_max + 1e-308), A_dif* z_step*z_step/(De.maxCoeff() + 1e-308)});
+	
+	} else {
+	
+		dt = std::min({A_cvt * z_step/vz_max, A_cvt * r_step/vr_max, A_dif* z_step*z_step/De.maxCoeff(), A_dif * r_step*r_step/De.maxCoeff()});
+	
+	}
+	dt = 1e-13;
+	dt = 20e-12;
+
+	int counter = 0; // FOR TESTING PURPOSES REMOVE WHEN DONE, only applied to the first integration mode
+
+	for (Specie& s : species){
+
+		counter++;
+
+		Eigen::MatrixXd new_n = Eigen::MatrixXd::Zero(r_size, z_size);
+		Eigen::MatrixXd new_new_n = Eigen::MatrixXd::Zero(r_size, z_size);
+		Eigen::MatrixXd midfluxn = Eigen::MatrixXd::Zero(r_size, z_size);
+
+		if (int_mode == 0){
+
+			for (int i = 0; i < r_size; i++){
+		
+				for (int j = 0; j < z_size; ++j){ // changed from 0 and z _size to 1 and z_size - 1
+					
+					if (counter == 1){
+						midfluxn(i,j) =  conv.calcFlux_UNO3(i, j, mu(i,j), De(i,j), dt, 1, s.get_density());
+						new_n(i, j) = s.get_density()(i, j) + dt * (midfluxn(i, j)/vols(i, j) + Se(i,j));
+					} else {
+						new_n(i, j) = s.get_density()(i, j) + dt * Se(i,j);
+					}
+		
+					//midfluxni(i,j) = calcFlux(i, j, 0, 0, dt, ni, alph);
+		
+					//new_ne(i, j) = ne(i, j) + dt * (midfluxn(i, j)/vols(i, j) + Se(i,j));
+		
+					//new_ni(i, j) = ni(i, j) + dt * Se(i,j);//midfluxni(i, j);
+
+				}
+			}
+
+		} else if (int_mode == 1){
+
+			for (int i = 0; i < r_size; i++){
+		
+				for (int j = 0; j < z_size; ++j){ 
+		
+					midfluxn(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, s.get_density());
+		
+					//midfluxni(i,j) = calcFlux_superbee(i, j, 0, 0, dt, ni, alph);
+		
+					new_new_n(i, j) = s.get_density()(i, j) + dt * midfluxn(i, j)/vols(i, j);
+		
+					//new_new_ni(i, j) = ni(i, j) + dt * midfluxni(i, j);
+
+				}
+			}
+
+			for (int i = 0; i < r_size; i++){
+		
+				for (int j = 0; j < z_size; ++j){ // ter atencao n(i,j) * mu
+		
+					new_n(i,j) = s.get_density()(i, j) + dt/2*(midfluxn(i, j) + conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, new_new_n))/vols(i, j);
+
+					//new_ni(i,j) = ni(i, j) + dt/2*(midfluxni(i, j) + calcFlux_superbee(i, j,  0,  0, dt, new_new_ni, alph))/vols(i, j);
+
+					//new_ni(i, j) = ni(i, j) + dt * Se(i,j);//midfluxni(i, j); NEWLY CHANGED
+				}	
+			}
+
+		} else if (int_mode == 2){
+
+			Eigen::MatrixXd k1 = Eigen::MatrixXd::Zero(r_size, z_size);
+			Eigen::MatrixXd k2 = Eigen::MatrixXd::Zero(r_size, z_size);
+			Eigen::MatrixXd k3 = Eigen::MatrixXd::Zero(r_size, z_size);
+			Eigen::MatrixXd k4 = Eigen::MatrixXd::Zero(r_size, z_size);
+
+			Eigen::MatrixXd helpk1 = Eigen::MatrixXd::Zero(r_size, z_size);
+			Eigen::MatrixXd helpk2 = Eigen::MatrixXd::Zero(r_size, z_size);
+			Eigen::MatrixXd helpk3 = Eigen::MatrixXd::Zero(r_size, z_size);
+			Eigen::MatrixXd helpk4 = Eigen::MatrixXd::Zero(r_size, z_size);
+
+			for (int i = 0; i < r_size; i++){
+
+				for (int j = 0; j < z_size; ++j){ 
+		
+					k1(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, s.get_density());
+		
+				}
+			}
+		
+			helpk1 = s.get_density() + k1 * dt/2.;
+		
+			for (int i = 0; i < r_size; i++){
+		
+				for (int j = 0; j < z_size; ++j){ 
+		
+					k2(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, helpk1);
+		
+				}
+			}
+		
+			helpk2 = s.get_density() + k2 * dt/2.;
+		
+			for (int i = 0; i < r_size; i++){
+		
+				for (int j = 0; j < z_size; ++j){ 
+		
+					k3(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, helpk2);
+		
+				}
+			}
+		
+			helpk3 = s.get_density() + k3 * dt; // Atencao, provavelmente adicionar /vols() ????
+		
+			for (int i = 0; i < r_size; i++){
+		
+				for (int j = 0; j < z_size; ++j){ 
+		
+					k4(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, helpk3);
+				}
+			}
+			
+		
+			for (int i = 0; i < r_size; i++){
+		
+				for (int j = 0; j < z_size; ++j){ 
+		
+					new_n(i,j) = s.get_density()(i,j) + dt*(((k1(i,j) + 2*k2(i,j) + 2*k3(i,j) + k4(i,j))/vols(i, j))/6 + Se(i,j));
+
+					// new_ni(i, j) = ni(i, j) + dt * Se(i,j); NEWLY CHANGED
+				}
+			}
+		
+		}
+		//std::cout<<new_n<<std::endl;
+		s.update_density(new_n);
+	}
+
+	//ne = new_n;
+	//ni = new_ni;
+
+	t = t+dt; // UPDATE TIME
+
+	//solve_Poisson();
+
+	//write_dt(dt_file, dt);
+
+	//if ( ti % 999 == 0){
+		//std::cout <<De<<std::endl;
+		//std::cout <<Se*dt<<std::endl;
+
+	//std::cout << " t = "<<t<<std::endl;
+	//std::cout << " dt =" <<dt<<std::endl;
+	//}	
+}
+
+void Simulation::write_dens(std::ofstream& file){
+	//std::cout << std::fixed << std::setprecision(21);
+	//std::cout<<"Density writen at "<<Pot<<std::endl;
+	file << "Time: " << t << "\n";
+    file << species[0].get_density() << "\n";
+    file << "----\n";  // Separator for the next matrix 
 }
 
 void Simulation::set_grid1D(int n, double dz){
@@ -165,6 +410,10 @@ void Simulation::set_grid2D(int n, int m, double dr, double dz){
 	z_step = dz;
 }
 
+void Simulation::set_species(std::vector<Specie> _species){
+	species = _species;
+}
+
 void Simulation::set_dieletric(Eigen::VectorXd _eps){
 	eps = _eps;
 }
@@ -173,23 +422,29 @@ void Simulation::set_geometry(std::string _geom){
 	geometry = _geom;
 }
 
-void Simulation::set_potential(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> a){
-	pot = a;
+void Simulation::set_potential(const Eigen::MatrixXd& a){
+	pot = a; 
 }
 
-void Simulation::set_Er(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> a){
+void Simulation::set_Er(const Eigen::MatrixXd& a){
 	er = a;
 }
 
-void Simulation::set_Ez1(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> a){
+void Simulation::set_Ez1(const Eigen::MatrixXd& a){
+	//std::cout<<a<<std::endl;
 	ez1 = a;
+	//std::cout<<ez1<<std::endl;
 }
 
-void Simulation::set_Ez2(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> a){
+void Simulation::set_Ez2(const Eigen::MatrixXd& a){
 	ez2 = a;
 }
 
 // GETTER FUNTIONS
+
+double Simulation::get_t(){
+	return t;
+}
 
 int Simulation::get_r_size(){
 	return r_size;
@@ -216,7 +471,6 @@ Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Simulation::get_vols(){
 }
 
 Eigen::Vector<double, Eigen::Dynamic> Simulation::get_eps(){
-
 	return eps;
 }
 
@@ -238,4 +492,8 @@ double** Simulation::get_phis(){
 
 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Simulation::get_rho(){
 	return rho;
+}
+
+Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Simulation::get_Ez1(){
+	return ez1;
 }

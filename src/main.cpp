@@ -1,10 +1,11 @@
-#include "placeholder.hpp"
-#include "poisson1DCart.hpp"
+//#include "placeholder.hpp"
+//#include "poisson1DCart.hpp"
 #include "poisson2DCyl.hpp"
 #include "specie.hpp"
 #include "chemistry.hpp"
 #include "simulation.hpp"
 #include "poissonsolver2d.hpp"
+#include "convection.hpp"
 
 
 #include <cmath>
@@ -49,8 +50,8 @@ int main() {
     int size_r = 1;
     int size_z = 501; // 501
 
-    std::map<int, double> eps_map;
-    std::map<int, double> sig_map;
+    //std::map<int, double> eps_map;
+    //std::map<int, double> sig_map;
 
     Eigen::MatrixXd ne = Eigen::MatrixXd::Constant(size_r, size_z, 0);
     //Eigen::MatrixXd ne = Eigen::MatrixXd::Constant(size_r, size_z, 0);
@@ -59,23 +60,9 @@ int main() {
     //double fronteira[] = {0,0,1,0};
     double fronteira_livre[] = {0,0,1,1}; // zmin, zmax, r0, rmax
 
-    sig_map[0] = 0;
-
-    //eps_map[0] = no_epsi;
-    //eps_map[66] = no_epsi*2;
-    //eps_map[132] = no_epsi*10;
-
-    std::vector<std::pair<int, double>> eps_vec = {{0, epsi}};//, {66, 2.0}, {132, 10.0}};
-    //std::vector<std::pair<int, double>> sig_vec = {{49,8e-5}};
-    std::vector<std::pair<int, double>> sig_vec = {{0,0}};
-
     Eigen::VectorXd eps = Eigen::VectorXd::Constant(size_z, epsi);
     Eigen::VectorXd sig = Eigen::VectorXd::Constant(size_z, 0);
 
-    // =======
-    // Convection schemes Testing
-    // =======
-    
     double height = 1e20;
     int startRange = 200; //200   // Starting index for the non-zero range
     int endRange = 300;   //300  // Ending index for the non-zero range
@@ -88,12 +75,58 @@ int main() {
         }   
     }
 
+    int react_e[] = {0,0,0,1,1,1,0};
+
+    Specie electron("e", -1, 511, react_e, ne);
+    Specie ion("i", 1, 511, react_e, ni);
+
+    std::vector<Specie> species;
+    species.push_back(electron);
+    species.push_back(ion);
+
+    // NEW MAIN FROM HERE
+
+    Simulation simul(size_r, size_z, 20.0e-6, 20.0e-6, "cartesian", eps, species);
+
+    PoissonSolver2D solver(10e3,0,0,0,fronteira_livre,sig,simul);
+
+    solver.solve();
+
+    std::cout<<simul.get_Ez1()<<std::endl;
+
+    std::ofstream file("rho_data.txt");
+    simul.write_dens(file);
+    
+    int a = 0;
+
+    while (simul.get_t() <= 5e-8) {
+        //std::cout <<a<<std::endl;
+        a++;
+        if (a%100 == 0){
+            std::cout<< "time "<<simul.get_t()<<std::endl;
+        }
+        simul.push_time(0);
+        solver.solve();
+    }
+    std::cout<< "iter "<<a<<std::endl;
+    simul.write_dens(file);
+    
+    
+    //Poisson2DCyl testPoisson2D(size_r,size_z,20.0e-6,20.0e-6,eps, sig);
+    //std::ofstream file2("rho_data2.txt");
+    //testPoisson2D.solve(10e3,0,0,0, ne,ni, fronteira_livre);
+    //testPoisson2D.solve_Poisson();
+    //std::cout <<" RIGHT" <<std::endl;
+    //std::cout << testPoisson2D.Ez1<<std::endl;
+    //testPoisson2D.write_dens(file2);
+
+    /*
     // ====================
     //
     //  Polynomial Fitting
     //
     // ====================
-
+    
     std::ifstream mobfile("../bolsig/N2mob.txt"); // Replace "data.txt" with your file name
     if (!mobfile.is_open()) {
         std::cerr << "Error: Unable to open the file!" << std::endl;
@@ -179,6 +212,6 @@ int main() {
 
     testPoisson2D.write_fields("f");
     testPoisson2D.write_dens(file);
-
+    */
     return 0;
 }

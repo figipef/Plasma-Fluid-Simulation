@@ -329,15 +329,15 @@ def load_all_matrices(filename):
 
 # Load the data
 times, matrices, nmax, nmin = load_all_matrices("build/rho_data.txt")
-times2, matrices2, nmax2, nmin2 = load_all_matrices("build/rho_data RK4 O.1PS NO CURRLIM UNO3.txt")
-times3, matrices3, nmax3, nmin3 = load_all_matrices("build/rho_data UNO3 norm.txt")
-times4, matrices4, nmax4, nmin4 = load_all_matrices("build/rho_data UNO3 trap.txt")
-times5, matrices5, nmax5, nmin5 = load_all_matrices("build/rho_data UNO3 RK4.txt")
-
-times6, matrices6, nmax6, nmin6 = load_all_matrices("build/rho_data SOLUTION SP.txt")
-times7, matrices7, nmax7, nmin7 = load_all_matrices("build/rho_data SP norm.txt")
-times8, matrices8, nmax8, nmin8 = load_all_matrices("build/rho_data SP trap.txt")
-times9, matrices9, nmax9, nmin9 = load_all_matrices("build/rho_data SP RK4.txt")
+#times2, matrices2, nmax2, nmin2 = load_all_matrices("build/rho_data RK4 O.1PS NO CURRLIM UNO3.txt")
+#times3, matrices3, nmax3, nmin3 = load_all_matrices("build/rho_data UNO3 norm.txt")
+#times4, matrices4, nmax4, nmin4 = load_all_matrices("build/rho_data UNO3 trap.txt")
+#times5, matrices5, nmax5, nmin5 = load_all_matrices("build/rho_data UNO3 RK4.txt")
+#
+#times6, matrices6, nmax6, nmin6 = load_all_matrices("build/rho_data SOLUTION SP.txt")
+#times7, matrices7, nmax7, nmin7 = load_all_matrices("build/rho_data SP norm.txt")
+#times8, matrices8, nmax8, nmin8 = load_all_matrices("build/rho_data SP trap.txt")
+#times9, matrices9, nmax9, nmin9 = load_all_matrices("build/rho_data SP RK4.txt")
 
 # Set up the figure and axis
 #fig, ax = plt.subplots()
@@ -511,7 +511,7 @@ plt.ylim(0,5e3)
 # Show the plot
 plt.show()
 """
-
+"""
 dt_data = np.loadtxt("build/dt_data.txt")
 
 plt.plot(dt_data, linestyle='-', label='Data', lw=2)
@@ -521,15 +521,15 @@ plt.ylabel("dt(s)")
 plt.legend()
 plt.grid(True)
 plt.show()
-
+"""
 i = 1
-x = np.linspace(0,10,int(i*500))
+x = np.linspace(1,7,int(i*300))
 x_original = np.linspace(0,10,int(500))
 # FOR UNO3
-plt.plot(x,np.array(matrices[-1][-1][int(i*0):int(i*500)]), color= "black", label="current test", ls = "solid")
+plt.plot(x,np.array(matrices[-1][-1][int(i*50):int(i*350)]), color= "black", label="current test", ls = "solid")
 #plt.plot(x,np.array(matrices[-1][-2][int(i*50):int(i*350)]), color= "red", label="current test", ls = "--")
 
-plt.plot(x_original,np.array(matrices2[-1][0][int(0):int(500)]), color= "green", label="sol UNO3", lw= 1)
+#plt.plot(x_original,np.array(matrices2[-1][0][int(0):int(500)]), color= "green", label="sol UNO3", lw= 1)
 #plt.plot(x_original,np.array(matrices3[-1][0][int(i*50):int(i*350)]), color= "blue", label="nor", lw= 1)
 #plt.plot(x_original,np.array(matrices4[-1][0][int(i*50):int(i*350)]), color= "red", label="trap", lw= 1)
 #plt.plot(x_original,np.array(matrices5[-1][0][int(i*50):int(i*350)]), color= "black", label="RK4", lw= 1, ls= "--")
@@ -549,7 +549,7 @@ x = np.linspace(0,10,int(i*500))
 print(matrices[-1][0])
 
 i = 1
-x = np.linspace(0,10,int(i*500))
+x = np.linspace(1,7,int(i*500))
 #plt.plot(x,matrices[-1][-1][int(i*50):int(i*350)], color = "red", label="RK4")
 """
 i = 1
@@ -557,7 +557,7 @@ x = np.linspace(1,7,i*300)
 plt.plot(x,matrices2[-1][0][int(i*50):int(i*350)], color = "green", label="RK4")
 """
 plt.yscale("log")
-plt.ylim(1e17,1e21)
+plt.ylim(1e12,1e21)
 plt.grid(True)
 plt.title(r'Density(z)')
 plt.show()

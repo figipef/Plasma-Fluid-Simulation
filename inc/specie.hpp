@@ -11,7 +11,7 @@ class Specie{
 
 		Specie();
 
-		Specie(std::string, int, double, int*);
+		Specie(std::string, int, double, int*, Eigen::MatrixXd&);
 
 		std::string get_name();
 
@@ -21,11 +21,15 @@ class Specie{
 
 		double get_qm_ratio();
 
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> get_density();
+
+		void update_density(Eigen::MatrixXd&);
+
 	private:
 
 		std::string name;
 
-		int charge;
+		int charge; // whole units
 
 		double mass;
 
