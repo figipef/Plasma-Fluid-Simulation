@@ -5,7 +5,6 @@ PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VI
 
 	// Set up all variables necessary from simul
 
-	//simul = _simul;
 	sig = _sig;
 
 	int r_size = simul.get_r_size();
@@ -99,6 +98,8 @@ PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VI
 	std::vector<Eigen::Triplet<double>> triplets;
 	triplets.reserve(r_size * z_size * 5);
 
+	// Create the matrix that's needed for the calcualtion
+
 	for (int i = 0; i < r_size; i++){
 
 		for (int j = 0; j < z_size; j++){
@@ -131,7 +132,7 @@ PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VI
 
 	solver.analyzePattern(PHI);
 
-    solver.factorize(PHI);
+    solver.factorize(PHI); // Set up the factorization so that solving the system is faster
 
 	auto t2 = std::chrono::high_resolution_clock::now();
 
@@ -142,7 +143,9 @@ PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VI
 
 void PoissonSolver2D::solve(){
 
-	simul.update_charge_density();
+	simul.update_charge_density(); // Update the charge density values
+
+	// get the necessary parameters from the simulation
 
 	int r_size = simul.get_r_size();
 	int z_size = simul.get_z_size();
@@ -151,24 +154,22 @@ void PoissonSolver2D::solve(){
 	double z_step = simul.get_dz();
 
 	Eigen::Vector<double, Eigen::Dynamic> eps = simul.get_eps();
-
-	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RHS = Eigen::MatrixXd::Zero(r_size, z_size);
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> rho = simul.get_rho();
 	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> vols = simul.get_vols();
 
-	//calculate_charge_density();
+	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RHS = Eigen::MatrixXd::Zero(r_size, z_size); // Right hand side of the equation
 
 	for (int i = 0; i < r_size; i++){
 		for (int j = 0; j < z_size; j++){
 
-			RHS(i,j) = rhs_i(i,j) + rho(i,j) * vols(i,j);
+			RHS(i,j) = rhs_i(i,j) + rho(i,j) * vols(i,j); // calculate the right hand side
 		}
 	}
 
 	Eigen::VectorXd b(RHS.size());
     b = Eigen::Map<const Eigen::VectorXd>(RHS.data(), RHS.size());
 
-    Eigen::VectorXd v = solver.solve(b);
+    Eigen::VectorXd v = solver.solve(b); // Just sovle the matrix system
 
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> V = Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(v.data(), r_size, z_size);    
 
@@ -189,6 +190,8 @@ void PoissonSolver2D::solve(){
 				double epsj1 = eps(j);
 				double epsj2 = eps(j+1);
 
+				// Calculate the Eletric field
+
 				E1_z(i,j) = (- sig(j) * hdz + epsj2*V(i,j) - epsj2*V(i,j+1)) / (epsj1*hdz + epsj2*hdz); 
 				E2_z(i,j) = (sig(j) * hdz +epsj1*V(i,j) - epsj1*V(i,j+1)) / (epsj1*hdz + epsj2*hdz);
 
@@ -201,6 +204,9 @@ void PoissonSolver2D::solve(){
 			} 
 		}
 	}
+
+	// Save the values
+
 	simul.set_potential(V);
 	simul.set_Er(E_r); 
 	simul.set_Ez1(E1_z);

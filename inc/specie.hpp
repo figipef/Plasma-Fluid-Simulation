@@ -35,7 +35,7 @@ class Specie{
 
 		int *react_net; // net value for each reaction in the array form
 
-		double qm_ratio;
+		double qm_ratio; // charge mass ratio may be needed for some calculations
 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> n; // density (m^-3)
 };

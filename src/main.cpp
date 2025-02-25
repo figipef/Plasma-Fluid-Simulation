@@ -16,6 +16,8 @@
 #include <fstream>   // For std::ofstream
 #include <iostream>  // For std::cerr
 #include <chrono>
+#include <sstream>
+#include <unordered_map>
 
 double epsi =8.85418781762e-12;
 
@@ -46,6 +48,57 @@ Eigen::VectorXd polynomialFit(const std::vector<double>& x, const std::vector<do
 }
 
 int main() {
+    std::ifstream input_file("input.txt"); // Open the input file
+    if (!input_file) {
+        std::cerr << "Error: Could not open the file!" << std::endl;
+        return 1;
+    }
+    
+    std::unordered_map<std::string, std::string> values;
+    std::string line;
+    
+    while (std::getline(input_file, line)) {
+        std::istringstream iss(line);
+        std::string key, value, unit;
+        
+        if (std::getline(iss, key, '=')) {
+            iss >> value >> unit; // Extract value and unit
+            values[key] = value;  // Store value in the map
+        }
+    }
+    input_file.close();
+    
+    // Convert to appropriate types
+    double gas_temp = std::stod(values["GAS_TEMP"]);
+    double gas_pressure = std::stod(values["GAS_PRESSURE"]);
+    double electron_density = std::stod(values["ELECTRON_DENSITY"]);
+    double electron_mean_energy = std::stod(values["ELECTRON_MEAN_ENERGY"]);
+    double secondary_electron_mean_energy = std::stod(values["SECONDARY_ELECTRON_MEAN_ENERGY"]);
+    int grid_size = std::stoi(values["GRID_SIZE"]);
+    int grid_init = std::stoi(values["GRID_INIT"]);
+    int grid_end = std::stoi(values["GRID_END"]);
+    double length = std::stod(values["LENGTH"]);
+    double left_potential = std::stod(values["LEFT_POTENTIAL"]);
+    double right_potential = std::stod(values["RIGHT_POTENTIAL"]);
+    std::string potential_type = values["POTENTIAL_TYPE"];
+    int number_species = std::stoi(values["NUMBER_SPECIES"]);
+    int number_reactions = std::stoi(values["NUMBER_REACTIONS"]);
+    
+    // Print values to verify
+    std::cout << "GAS_TEMP: " << gas_temp << " K" << std::endl;
+    std::cout << "GAS_PRESSURE: " << gas_pressure << " TORR" << std::endl;
+    std::cout << "ELECTRON_DENSITY: " << electron_density << " M-3" << std::endl;
+    std::cout << "ELECTRON_MEAN_ENERGY: " << electron_mean_energy << " EV" << std::endl;
+    std::cout << "SECONDARY_ELECTRON_MEAN_ENERGY: " << secondary_electron_mean_energy << " EV" << std::endl;
+    std::cout << "GRID_SIZE: " << grid_size << std::endl;
+    std::cout << "GRID_INIT: " << grid_init << std::endl;
+    std::cout << "GRID_END: " << grid_end << std::endl;
+    std::cout << "LENGTH: " << length << " M" << std::endl;
+    std::cout << "LEFT_POTENTIAL: " << left_potential << " V" << std::endl;
+    std::cout << "RIGHT_POTENTIAL: " << right_potential << " V" << std::endl;
+    std::cout << "POTENTIAL_TYPE: " << potential_type << std::endl;
+    std::cout << "NUMBER_SPECIES: " << number_species << std::endl;
+    std::cout << "NUMBER_REACTIONS: " << number_reactions << std::endl;
 
     int size_r = 1;
     int size_z = 501; // 501

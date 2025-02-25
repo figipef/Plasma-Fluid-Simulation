@@ -165,8 +165,6 @@ void Simulation::update_charge_density(){
 
 void Simulation::push_time(int int_mode){
 
-	//double mu = 0.03; // To be changed later !!!
-	//double De = 0.1;
 	Convection conv(z_step, z_size, S_hori, ez1);
 	double dt;
 
