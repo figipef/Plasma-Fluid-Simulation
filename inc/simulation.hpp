@@ -21,7 +21,7 @@ class Simulation{
 
 		Simulation(int, int, double, double, std::vector<Specie>&); // Constructor with only grid and Dieletric 
 
-		Simulation(int, int, double, double, std::string, Eigen::VectorXd&, std::vector<Specie>&); // Constructor with grid, Dieletric and Species
+		Simulation(int, int, double, double, std::string, Eigen::VectorXd&, std::vector<Specie>&, int, int, double, double); // Constructor with grid, Dieletric and Species
 
 		void update_charge_density();
 
@@ -83,6 +83,10 @@ class Simulation{
 		double r_step;
 		double z_step;
 
+		// Grid gas init and end
+		double grid_init;
+		double grid_end;
+
 		// Matrices for geometrical stored values 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> S_hori; // Surfaces
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> S_vert; // Surfaces
@@ -96,6 +100,9 @@ class Simulation{
 
 		// Species included in the Simulation
 		std::vector<Specie>& species;
+
+		// Electron emission energies
+		double secondary_emission_energy;
 
 		// Grid real values
 

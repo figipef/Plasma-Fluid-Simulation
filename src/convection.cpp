@@ -10,7 +10,7 @@ Convection::Convection(double _z_step, double _z_size, Eigen::MatrixXd _S_hori, 
 	Ez1 = _Ez1;
 }
 
-double Convection::calcFlux_superbee(int i , int j ,double mu, double De, double dt, int currlim, Eigen::MatrixXd n){
+double Convection::calcFlux_superbee(int i , int j ,double mu, double De, double dt, int currlim, Eigen::MatrixXd n, int charge){
 	double EPS0 = 8.85418781762e-12;
 	double ECHARGE = 1.6e-19;
 
@@ -21,20 +21,20 @@ double Convection::calcFlux_superbee(int i , int j ,double mu, double De, double
 
 		double re = (n(i,j) - 0) / (n(i,j+1) - n(i,j) + 1e-8); 
 
-        double ce = (-dt * mu * Ez1(i,j)) / z_step;
+        double ce = (-dt * mu * Ez1(i,j)* -charge) / z_step;
 
         double re_prime = (n(i,j+1) - n(i,j+2)) / (n(i,j) - n(i,j+1) + 1e-8);
         double ce_prime = -ce;
 
         double nem;
-        if (mu * Ez1(i,j) <= 0) {
+        if (mu * Ez1(i,j) * -charge  <= 0) {
             nem = n(i,j) + (phia(re) / 2) * (1 - ce) * (n(i,j+1) - n(i,j));
         } else {
             nem = n(i,j+1) + (phia(re_prime) / 2) * (1 - ce_prime) * (n(i,j) - n(i,j+1));
         }
 
         flux_left = 0.0;
-        flux_right = -mu * Ez1(i,j) * nem - (De / z_step) * (n(i,j+1) - n(i,j));
+        flux_right = -mu * Ez1(i,j)* -charge * nem - (De / z_step) * (n(i,j+1) - n(i,j));
 
         if (currlim == 1){
         	double EField_star_right = std::max(std::abs(Ez1(i,j)), (De * std::abs(n(i,j+1) - n(i,j))) / (mu*z_step * std::max({n(i,j), n(i,j+1), 1e-8})));
@@ -48,7 +48,7 @@ double Convection::calcFlux_superbee(int i , int j ,double mu, double De, double
     } else if (j == z_size - 1) {
 
         double rw = (n(i,j-1) - n(i,j-2)) / (n(i,j) - n(i,j-1) + 1e-8);
-        double cw = (-dt * mu * Ez1(i,j-1)) / z_step;
+        double cw = (-dt * mu * Ez1(i,j-1)* -charge) / z_step;
 
         double rw_prime;
         if ( j == z_size - 2){
@@ -61,13 +61,13 @@ double Convection::calcFlux_superbee(int i , int j ,double mu, double De, double
 
         double nw;
 
-        if (mu * Ez1(i,j-1) <= 0) {
+        if (mu * Ez1(i,j-1)* -charge <= 0) {
             nw = n(i,j-1) + (phia(rw) / 2) * (1 - cw) * (n(i,j) - n(i,j-1));
         } else {
             nw = n(i,j) + (phia(rw_prime) / 2) * (1 - cw_prime) * (n(i,j-1) - n(i,j));
         }
 
-        flux_left = -mu * Ez1(i,j-1) * nw - (De / (z_step) * (n(i,j) - n(i,j-1)));
+        flux_left = -mu * Ez1(i,j-1)* -charge * nw - (De / (z_step) * (n(i,j) - n(i,j-1)));
         flux_right = 0;
         if (currlim == 1){
         	double EField_star_left = std::max( std::abs(Ez1(i,j-1)), (De * std::abs(n(i,j) - n(i,j-1))) / (mu*z_step * std::max({n(i,j-1), n(i,j), 1e-8})));
@@ -86,7 +86,7 @@ double Convection::calcFlux_superbee(int i , int j ,double mu, double De, double
 	
     	// Calculate re, ce, rw, cw, and their derivatives
     	re = (n(i,j) - n(i,j-1)) / (n(i,j+1) - n(i,j) + 1e-8);
-    	ce = (-dt * mu * Ez1(i,j)) / z_step;
+    	ce = (-dt * mu * Ez1(i,j)* -charge) / z_step;
 
 		if (j == 1){
 			rw = (n(i,j-1) - 0) / (n(i,j) - n(i,j-1) + 1e-8);
@@ -94,7 +94,7 @@ double Convection::calcFlux_superbee(int i , int j ,double mu, double De, double
 			rw = (n(i,j-1) - n(i,j-2)) / (n(i,j) - n(i,j-1) + 1e-8);
 		}
     	
-    	cw = (-dt * mu * Ez1(i,j-1)) / z_step;
+    	cw = (-dt * mu * Ez1(i,j-1)* -charge) / z_step;
 
 		if ( j == z_size - 2){
 			re_prime = (n(i,j+1) - 0) / (n(i,j) - n(i,j+1) + 1e-8);
@@ -108,23 +108,23 @@ double Convection::calcFlux_superbee(int i , int j ,double mu, double De, double
     	cw_prime = -cw;
 	
     	// Compute ne
-    	if (mu * Ez1(i,j) <= 0) { // Zero or positive velocity
+    	if (mu * Ez1(i,j)* -charge <= 0) { // Zero or positive velocity
     	    ne = n(i,j) + (phia(re) / 2.0) * (1.0 - ce) * (n(i,j+1) - n(i,j));
     	} else {
     	    ne = n(i,j+1) + (phia(re_prime) / 2.0) * (1.0 - ce_prime) * (n(i,j) - n(i,j+1));
     	}
 	
     	// Compute nw
-    	if (mu * Ez1(i,j-1) <= 0) {
+    	if (mu * Ez1(i,j-1)* -charge <= 0) {
     	    nw = n(i,j-1) + (phia(rw) / 2.0) * (1.0 - cw) * (n(i,j) - n(i,j-1));
     	} else {
     	    nw = n(i,j) + (phia(rw_prime) / 2.0) * (1.0 - cw_prime) * (n(i,j-1) - n(i,j));
     	}
 	
     	// Compute fluxes
-    	flux_left = -mu * Ez1(i,j-1) * nw - (De / z_step) * (n(i,j) - n(i,j-1));
+    	flux_left = -mu * Ez1(i,j-1)* -charge * nw - (De / z_step) * (n(i,j) - n(i,j-1));
 	
-    	flux_right = -mu * Ez1(i,j) * ne - (De / z_step) * (n(i,j+1) - n(i,j));
+    	flux_right = -mu * Ez1(i,j)* -charge * ne - (De / z_step) * (n(i,j+1) - n(i,j));
 		
 		if ( currlim == 1){
 			// Compute EField_star_right and adjust flux_right if needed
@@ -148,7 +148,7 @@ double Convection::calcFlux_superbee(int i , int j ,double mu, double De, double
     return (flux_left - flux_right)*S_hori(i,j);    
 }
 
-double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt, int currlim, Eigen::MatrixXd n){
+double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt, int currlim, Eigen::MatrixXd n, int charge){
 	double EPS0 = 8.85418781762e-12;
 	double ECHARGE = 1.6e-19;
 
@@ -160,9 +160,9 @@ double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt,
 		double g_dc;
 		double g_cu;
 		double nem;
-		double ve = -mu * Ez1(i,j);
+		double ve = -mu * Ez1(i,j)* -charge;
 
-        if (mu * Ez1(i,j) <= 0) { // Velocidade nula ou positiva
+        if (mu * Ez1(i,j)* -charge <= 0) { // Velocidade nula ou positiva
 
         	g_dc = (n(i, j + 1) - n(i, j))/z_step;
 			g_cu = (n(i, j) - 0)/z_step;
@@ -181,7 +181,7 @@ double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt,
 
         flux_left = 0.0;
         //flux_left = -mu * Ez1(i,j) * nem - (De / z_step) * (n(i,j+1) - n(i,j)); // CHANGED
-        flux_right = -mu * Ez1(i,j) * nem - (De / z_step) * (n(i,j+1) - n(i,j));
+        flux_right = -mu * Ez1(i,j)* -charge * nem - (De / z_step) * (n(i,j+1) - n(i,j));
 
         if ( currlim == 1){
         	double EField_star_right = std::max(std::abs(Ez1(i,j)), (De * std::abs(n(i,j+1) - n(i,j))) / (mu*z_step * std::max({n(i,j), n(i,j+1), 1e-8})));
@@ -197,8 +197,8 @@ double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt,
 		double g_dc;
 		double g_cu;
 		double nw;
-		double vw = -mu * Ez1(i,j-1);
-        if (mu * Ez1(i,j-1) <= 0) { // Velocidade nula ou positiva
+		double vw = -mu * Ez1(i,j-1)* -charge;
+        if (mu * Ez1(i,j-1)* -charge <= 0) { // Velocidade nula ou positiva
 
 			g_dc = (n(i, j) - n(i, j - 1))/z_step;
 			g_cu = (n(i, j - 1) - n(i, j - 2))/z_step;
@@ -216,7 +216,7 @@ double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt,
 		    nw = n(i,j) + 0.5 * std::copysign(1.0, vw) * (z_step - std::abs(vw) * dt) * g_c;
         }
 
-        flux_left = -mu * Ez1(i,j-1) * nw - (De / z_step) * (n(i,j) - n(i,j-1));
+        flux_left = -mu * Ez1(i,j-1)* -charge * nw - (De / z_step) * (n(i,j) - n(i,j-1));
     	flux_right = 0;
     	//flux_right = flux_left; // CHANGED
     	if ( currlim == 1){
@@ -230,8 +230,8 @@ double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt,
 	
     } else { // Precisamos de ne e de nw
 
-		double ve = -mu * Ez1(i,j);
-		double vw = -mu * Ez1(i,j-1);
+		double ve = -mu * Ez1(i,j)* -charge;
+		double vw = -mu * Ez1(i,j-1)* -charge;
 
 		double g_c = 0;
 		double g_cu = 0;
@@ -240,7 +240,7 @@ double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt,
 		double nw = 0.0;
 		
 		// Handle velocity for ne
-		if (mu * Ez1(i,j) <= 0) { // Zero or positive velocity
+		if (mu * Ez1(i,j)* -charge <= 0) { // Zero or positive velocity
 
 			g_dc = (n(i, j + 1) - n(i, j))/z_step;
 			g_cu = (n(i, j) - n(i, j - 1))/z_step;
@@ -267,7 +267,7 @@ double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt,
 		}
 		
 		// Handle velocity for nw
-		if (mu * Ez1(i,j-1) <= 0) { // Zero or positive velocity
+		if (mu * Ez1(i,j-1)* -charge <= 0) { // Zero or positive velocity
 			
 			g_dc = (n(i, j) - n(i, j - 1))/z_step;
 
@@ -317,7 +317,7 @@ double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt,
     return (flux_left - flux_right)*S_hori(i,j);
 }
 
-double Convection::calcFlux_Koren(int i , int j ,double mu, double De, double dt, int currlim, Eigen::MatrixXd n){
+double Convection::calcFlux_Koren(int i , int j ,double mu, double De, double dt, int currlim, Eigen::MatrixXd n, int charge){
 	double EPS0 = 8.85418781762e-12;
 	double ECHARGE = 1.6e-19;
 
@@ -326,7 +326,7 @@ double Convection::calcFlux_Koren(int i , int j ,double mu, double De, double dt
 
 	if (j == 0) { // Só precisamos de ne
 
-		double ve = -mu * Ez1(i,j);
+		double ve = -mu * Ez1(i,j)* -charge;
 
         if (ve >= 0) { // Velocidade nula ou positiva
 
@@ -353,7 +353,7 @@ double Convection::calcFlux_Koren(int i , int j ,double mu, double De, double dt
         
     } else if (j == z_size - 1) { // Só precisamos de nw
 
-		double vw = -mu * Ez1(i,j-1);
+		double vw = -mu * Ez1(i,j-1)* -charge;
 
         if (vw >= 0) { // Velocidade nula ou positiva
 
@@ -380,8 +380,8 @@ double Convection::calcFlux_Koren(int i , int j ,double mu, double De, double dt
 	
     } else { // Precisamos de ne e de nw
 
-		double ve = -mu * Ez1(i,j);
-		double vw = -mu * Ez1(i,j-1);
+		double ve = -mu * Ez1(i,j)* -charge;
+		double vw = -mu * Ez1(i,j-1)* -charge;
 		
 		// Handle velocity for ne
 		if (ve >= 0) { // Zero or positive velocity
@@ -450,7 +450,7 @@ double Convection::calcFlux_Koren(int i , int j ,double mu, double De, double dt
     return (flux_left - flux_right)*S_hori(i,j);
 }
 
-double Convection::calcFlux_UNO2(int i , int j ,double mu, double De, double dt, int currlim, Eigen::MatrixXd n){
+double Convection::calcFlux_UNO2(int i , int j ,double mu, double De, double dt, int currlim, Eigen::MatrixXd n, int charge){
 	double EPS0 = 8.85418781762e-12;
 	double ECHARGE = 1.6e-19;
 
@@ -462,9 +462,9 @@ double Convection::calcFlux_UNO2(int i , int j ,double mu, double De, double dt,
 		double g_dc;
 		double g_cu;
 		double nem;
-		double ve = -mu * Ez1(i,j);
+		double ve = -mu * Ez1(i,j)* -charge;
 
-        if (mu * Ez1(i,j) <= 0) { // Velocidade nula ou positiva
+        if (mu * Ez1(i,j)* -charge <= 0) { // Velocidade nula ou positiva
 
         	g_dc = (n(i, j + 1) - n(i, j))/z_step;
 			g_cu = (n(i, j) - 0)/z_step;
@@ -483,7 +483,7 @@ double Convection::calcFlux_UNO2(int i , int j ,double mu, double De, double dt,
 
         flux_left = 0.0;
         //flux_left = -mu * Ez1(i,j) * nem - (De / z_step) * (n(i,j+1) - n(i,j)); // CHANGED
-        flux_right = -mu * Ez1(i,j) * nem - (De / z_step) * (n(i,j+1) - n(i,j));
+        flux_right = -mu * Ez1(i,j)* -charge * nem - (De / z_step) * (n(i,j+1) - n(i,j));
 
         if ( currlim == 1){
         	double EField_star_right = std::max(std::abs(Ez1(i,j)), (De * std::abs(n(i,j+1) - n(i,j))) / (mu*z_step * std::max({n(i,j), n(i,j+1), 1e-8})));
@@ -499,8 +499,8 @@ double Convection::calcFlux_UNO2(int i , int j ,double mu, double De, double dt,
 		double g_dc;
 		double g_cu;
 		double nw;
-		double vw = -mu * Ez1(i,j-1);
-        if (mu * Ez1(i,j-1) <= 0) { // Velocidade nula ou positiva
+		double vw = -mu * Ez1(i,j-1)* -charge;
+        if (mu * Ez1(i,j-1)* -charge <= 0) { // Velocidade nula ou positiva
 
 			g_dc = (n(i, j) - n(i, j - 1))/z_step;
 			g_cu = (n(i, j - 1) - n(i, j - 2))/z_step;
@@ -518,7 +518,7 @@ double Convection::calcFlux_UNO2(int i , int j ,double mu, double De, double dt,
 		    nw = n(i,j) + 0.5 * std::copysign(1.0, vw) * (z_step - std::abs(vw) * dt) * g_c;
         }
 
-        flux_left = -mu * Ez1(i,j-1) * nw - (De / z_step) * (n(i,j) - n(i,j-1));
+        flux_left = -mu * Ez1(i,j-1)* -charge * nw - (De / z_step) * (n(i,j) - n(i,j-1));
     	flux_right = 0;
     	//flux_right = flux_left; // CHANGED
     	if ( currlim == 1){
@@ -532,8 +532,8 @@ double Convection::calcFlux_UNO2(int i , int j ,double mu, double De, double dt,
 	
     } else { // Precisamos de ne e de nw
 
-		double ve = -mu * Ez1(i,j);
-		double vw = -mu * Ez1(i,j-1);
+		double ve = -mu * Ez1(i,j)* -charge;
+		double vw = -mu * Ez1(i,j-1)* -charge;
 
 		double g_c = 0;
 		double g_cu = 0;
@@ -542,7 +542,7 @@ double Convection::calcFlux_UNO2(int i , int j ,double mu, double De, double dt,
 		double nw = 0.0;
 		
 		// Handle velocity for ne
-		if (mu * Ez1(i,j) <= 0) { // Zero or positive velocity
+		if (mu * Ez1(i,j)* -charge <= 0) { // Zero or positive velocity
 
 			g_dc = (n(i, j + 1) - n(i, j))/z_step;
 			g_cu = (n(i, j) - n(i, j - 1))/z_step;
@@ -569,7 +569,7 @@ double Convection::calcFlux_UNO2(int i , int j ,double mu, double De, double dt,
 		}
 		
 		// Handle velocity for nw
-		if (mu * Ez1(i,j-1) <= 0) { // Zero or positive velocity
+		if (mu * Ez1(i,j-1)* -charge <= 0) { // Zero or positive velocity
 			
 			g_dc = (n(i, j) - n(i, j - 1))/z_step;
 

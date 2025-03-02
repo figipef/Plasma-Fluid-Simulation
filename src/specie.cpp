@@ -25,9 +25,8 @@ double Specie::get_mass(){
 	return mass;
 }
 
-double Specie::get_charge(){
+int Specie::get_charge(){
 	return charge;
-
 }
 
 double Specie::get_qm_ratio(){

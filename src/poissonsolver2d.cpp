@@ -92,7 +92,7 @@ PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VI
 
 	std::chrono::duration<double, std::milli> d1 = t1 - start;
     
-    std::cout << "Time taken to Load RHS: " << d1.count() << " ms" << std::endl;
+    //std::cout << "Time taken to Load RHS: " << d1.count() << " ms" << std::endl;
     //std::cout << "DENSE Matrix:\n" << RHS << std::endl;
 
 	std::vector<Eigen::Triplet<double>> triplets;
@@ -138,7 +138,7 @@ PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VI
 
 	std::chrono::duration<double, std::milli> d2 = t2 - t1;
     
-    std::cout << "Time taken to Load PHI's (coeffecients): " << d2.count() << " ms" << std::endl;
+    //std::cout << "Time taken to Load PHI's (coeffecients): " << d2.count() << " ms" << std::endl;
 }
 
 void PoissonSolver2D::solve(){

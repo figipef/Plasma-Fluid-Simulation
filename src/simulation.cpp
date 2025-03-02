@@ -30,9 +30,11 @@ Simulation::Simulation(int n, int m, double dr, double dz, std::vector<Specie>& 
 	z_step = dz;
 }
 
-Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Eigen::VectorXd& _eps, std::vector<Specie>& _species) : species(_species){
+Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Eigen::VectorXd& _eps, std::vector<Specie>& _species, int _grid_init, int _grind_end, double electron_energy, double sec_e_em_energy) : species(_species){
  
 	t = 0;
+
+	secondary_emission_energy = sec_e_em_energy;
 
 	r_size = n;
 	z_size = m;
@@ -40,6 +42,20 @@ Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Ei
 	z_step = dz;
 	eps = _eps;
 	geometry = _geom;
+
+	grid_init = _grid_init;
+	grid_end = _grind_end;
+
+	for (Specie s : species){
+		int fill[] = {0};
+		if (s.get_name() == "e"){
+			Eigen::MatrixXd temp_matrix = s.get_density() * electron_energy;
+			Specie electron_ener("e_energy", -1, 511, fill, temp_matrix);
+			species.push_back(electron_ener);
+		}
+	}
+
+	
 	//species = _species;
 
 	S_hori = Eigen::MatrixXd::Zero(r_size, z_size);
@@ -202,15 +218,6 @@ void Simulation::push_time(int int_mode){
 	}
 	
 	// Calculate Fluxes at each cell
-	
-	Eigen::MatrixXd new_ne = Eigen::MatrixXd::Zero(r_size, z_size);
-	Eigen::MatrixXd new_ni = Eigen::MatrixXd::Zero(r_size, z_size);
-
-	Eigen::MatrixXd new_new_ne = Eigen::MatrixXd::Zero(r_size, z_size);
-	Eigen::MatrixXd new_new_ni = Eigen::MatrixXd::Zero(r_size, z_size);
-
-	Eigen::MatrixXd midfluxne = Eigen::MatrixXd::Zero(r_size, z_size);
-	Eigen::MatrixXd midfluxni = Eigen::MatrixXd::Zero(r_size, z_size);
 
 	double vr_max = 1e-308;
 	if ( r_size > 1){
@@ -233,8 +240,9 @@ void Simulation::push_time(int int_mode){
 		dt = std::min({A_cvt * z_step/vz_max, A_cvt * r_step/vr_max, A_dif* z_step*z_step/De.maxCoeff(), A_dif * r_step*r_step/De.maxCoeff()});
 	
 	}
-	dt = 1e-13;
-	dt = 20e-12;
+
+	//dt = 1e-13;
+	//dt = 20e-12;
 
 	int counter = 0; // FOR TESTING PURPOSES REMOVE WHEN DONE, only applied to the first integration mode
 
@@ -250,21 +258,10 @@ void Simulation::push_time(int int_mode){
 
 			for (int i = 0; i < r_size; i++){
 		
-				for (int j = 0; j < z_size; ++j){ // changed from 0 and z _size to 1 and z_size - 1
-					
-					if (counter == 1){
-						midfluxn(i,j) =  conv.calcFlux_UNO3(i, j, mu(i,j), De(i,j), dt, 1, s.get_density());
-						new_n(i, j) = s.get_density()(i, j) + dt * (midfluxn(i, j)/vols(i, j) + Se(i,j));
-					} else {
-						new_n(i, j) = s.get_density()(i, j) + dt * Se(i,j);
-					}
-		
-					//midfluxni(i,j) = calcFlux(i, j, 0, 0, dt, ni, alph);
-		
-					//new_ne(i, j) = ne(i, j) + dt * (midfluxn(i, j)/vols(i, j) + Se(i,j));
-		
-					//new_ni(i, j) = ni(i, j) + dt * Se(i,j);//midfluxni(i, j);
+				for (int j = grid_init; j < grid_end; ++j){ // changed from 0 and z _size to 1 and z_size - 1
 
+					midfluxn(i,j) =  conv.calcFlux_UNO3(i, j, mu(i,j), De(i,j), dt, 1, s.get_density(), s.get_charge());
+					new_n(i, j) = s.get_density()(i, j) + dt * (midfluxn(i, j)/vols(i, j) + Se(i,j));
 				}
 			}
 
@@ -272,28 +269,22 @@ void Simulation::push_time(int int_mode){
 
 			for (int i = 0; i < r_size; i++){
 		
-				for (int j = 0; j < z_size; ++j){ 
+				for (int j = grid_init; j < grid_end; ++j){ 
 		
-					midfluxn(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, s.get_density());
-		
-					//midfluxni(i,j) = calcFlux_superbee(i, j, 0, 0, dt, ni, alph);
+					midfluxn(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, s.get_density(), s.get_charge());
 		
 					new_new_n(i, j) = s.get_density()(i, j) + dt * midfluxn(i, j)/vols(i, j);
-		
-					//new_new_ni(i, j) = ni(i, j) + dt * midfluxni(i, j);
+
 
 				}
 			}
 
 			for (int i = 0; i < r_size; i++){
 		
-				for (int j = 0; j < z_size; ++j){ // ter atencao n(i,j) * mu
+				for (int j = grid_init; j < grid_end; ++j){ // ter atencao n(i,j) * mu
 		
-					new_n(i,j) = s.get_density()(i, j) + dt/2*(midfluxn(i, j) + conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, new_new_n))/vols(i, j);
+					new_n(i,j) = s.get_density()(i, j) + dt/2*(midfluxn(i, j) + conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, new_new_n, s.get_charge()))/vols(i, j);
 
-					//new_ni(i,j) = ni(i, j) + dt/2*(midfluxni(i, j) + calcFlux_superbee(i, j,  0,  0, dt, new_new_ni, alph))/vols(i, j);
-
-					//new_ni(i, j) = ni(i, j) + dt * Se(i,j);//midfluxni(i, j); NEWLY CHANGED
 				}	
 			}
 
@@ -311,9 +302,9 @@ void Simulation::push_time(int int_mode){
 
 			for (int i = 0; i < r_size; i++){
 
-				for (int j = 0; j < z_size; ++j){ 
+				for (int j = grid_init; j < grid_end; ++j){ 
 		
-					k1(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, s.get_density());
+					k1(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, s.get_density(), s.get_charge());
 		
 				}
 			}
@@ -322,9 +313,9 @@ void Simulation::push_time(int int_mode){
 		
 			for (int i = 0; i < r_size; i++){
 		
-				for (int j = 0; j < z_size; ++j){ 
+				for (int j = grid_init; j < grid_end; ++j){ 
 		
-					k2(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, helpk1);
+					k2(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, helpk1, s.get_charge());
 		
 				}
 			}
@@ -333,9 +324,9 @@ void Simulation::push_time(int int_mode){
 		
 			for (int i = 0; i < r_size; i++){
 		
-				for (int j = 0; j < z_size; ++j){ 
+				for (int j = grid_init; j < grid_end; ++j){ 
 		
-					k3(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, helpk2);
+					k3(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, helpk2, s.get_charge());
 		
 				}
 			}
@@ -344,20 +335,18 @@ void Simulation::push_time(int int_mode){
 		
 			for (int i = 0; i < r_size; i++){
 		
-				for (int j = 0; j < z_size; ++j){ 
+				for (int j = grid_init; j < grid_end; ++j){ 
 		
-					k4(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, helpk3);
+					k4(i,j) = conv.calcFlux_Koren(i, j, mu(i,j), De(i,j), dt, 1, helpk3, s.get_charge());
 				}
 			}
 			
 		
 			for (int i = 0; i < r_size; i++){
 		
-				for (int j = 0; j < z_size; ++j){ 
+				for (int j = grid_init; j < grid_end; ++j){ 
 		
 					new_n(i,j) = s.get_density()(i,j) + dt*(((k1(i,j) + 2*k2(i,j) + 2*k3(i,j) + k4(i,j))/vols(i, j))/6 + Se(i,j));
-
-					// new_ni(i, j) = ni(i, j) + dt * Se(i,j); NEWLY CHANGED
 				}
 			}
 		
@@ -370,7 +359,7 @@ void Simulation::push_time(int int_mode){
 	//ni = new_ni;
 
 	t = t+dt; // UPDATE TIME
-
+	std::cout <<dt<<std::endl;
 	//solve_Poisson();
 
 	//write_dt(dt_file, dt);

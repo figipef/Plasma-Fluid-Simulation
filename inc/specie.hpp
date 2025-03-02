@@ -17,7 +17,7 @@ class Specie{
 
 		double get_mass();
 
-		double get_charge();
+		int get_charge();
 
 		double get_qm_ratio();
 

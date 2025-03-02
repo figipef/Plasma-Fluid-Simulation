@@ -8,13 +8,13 @@ class Convection {
 		Convection();
 		Convection(double, double, Eigen::MatrixXd, Eigen::MatrixXd&);
 
-		double calcFlux_superbee(int, int, double, double, double, int, Eigen::MatrixXd);
+		double calcFlux_superbee(int, int, double, double, double, int, Eigen::MatrixXd, int);
 
-		double calcFlux_UNO3(int, int, double, double, double, int, Eigen::MatrixXd);
+		double calcFlux_UNO3(int, int, double, double, double, int, Eigen::MatrixXd, int);
 
-		double calcFlux_UNO2(int, int, double, double, double, int, Eigen::MatrixXd);
+		double calcFlux_UNO2(int, int, double, double, double, int, Eigen::MatrixXd, int);
 
-		double calcFlux_Koren(int, int, double, double, double, int, Eigen::MatrixXd);
+		double calcFlux_Koren(int, int, double, double, double, int, Eigen::MatrixXd, int);
 
 	private:
 

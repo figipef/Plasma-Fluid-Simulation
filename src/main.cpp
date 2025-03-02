@@ -77,10 +77,12 @@ int main() {
     int grid_size = std::stoi(values["GRID_SIZE"]);
     int grid_init = std::stoi(values["GRID_INIT"]);
     int grid_end = std::stoi(values["GRID_END"]);
+    double rel_permitivity = std::stod(values["PERMITIVITY"]);
     double length = std::stod(values["LENGTH"]);
     double left_potential = std::stod(values["LEFT_POTENTIAL"]);
     double right_potential = std::stod(values["RIGHT_POTENTIAL"]);
     std::string potential_type = values["POTENTIAL_TYPE"];
+    double frequency = std::stod(values["FREQ"]);
     int number_species = std::stoi(values["NUMBER_SPECIES"]);
     int number_reactions = std::stoi(values["NUMBER_REACTIONS"]);
     
@@ -93,66 +95,80 @@ int main() {
     std::cout << "GRID_SIZE: " << grid_size << std::endl;
     std::cout << "GRID_INIT: " << grid_init << std::endl;
     std::cout << "GRID_END: " << grid_end << std::endl;
+    std::cout << "PERMITIVITY: " << rel_permitivity << std::endl;
     std::cout << "LENGTH: " << length << " M" << std::endl;
     std::cout << "LEFT_POTENTIAL: " << left_potential << " V" << std::endl;
     std::cout << "RIGHT_POTENTIAL: " << right_potential << " V" << std::endl;
     std::cout << "POTENTIAL_TYPE: " << potential_type << std::endl;
+    std::cout << "OSCILLATION FREQUENCY: " << frequency << std::endl;
     std::cout << "NUMBER_SPECIES: " << number_species << std::endl;
     std::cout << "NUMBER_REACTIONS: " << number_reactions << std::endl;
 
     int size_r = 1;
-    int size_z = 501; // 501
+    //int size_z = 501; // 501
 
-    //std::map<int, double> eps_map;
-    //std::map<int, double> sig_map;
-
-    Eigen::MatrixXd ne = Eigen::MatrixXd::Constant(size_r, size_z, 0);
-    //Eigen::MatrixXd ne = Eigen::MatrixXd::Constant(size_r, size_z, 0);
-    Eigen::MatrixXd ni = Eigen::MatrixXd::Constant(size_r, size_z, 0);
+    Eigen::MatrixXd ne = Eigen::MatrixXd::Constant(size_r, grid_size, 0);
+    Eigen::MatrixXd gas_dens = Eigen::MatrixXd::Constant(size_r, grid_size, 0);
+    Eigen::MatrixXd null = Eigen::MatrixXd::Constant(size_r, grid_size, 0);
 
     //double fronteira[] = {0,0,1,0};
     double fronteira_livre[] = {0,0,1,1}; // zmin, zmax, r0, rmax
 
-    Eigen::VectorXd eps = Eigen::VectorXd::Constant(size_z, epsi);
-    Eigen::VectorXd sig = Eigen::VectorXd::Constant(size_z, 0);
+    Eigen::VectorXd eps = Eigen::VectorXd::Constant(grid_size, epsi);
+    Eigen::VectorXd sig = Eigen::VectorXd::Constant(grid_size, 0);
 
-    double height = 1e20;
-    int startRange = 200; //200   // Starting index for the non-zero range
-    int endRange = 300;   //300  // Ending index for the non-zero range
+    double gas_density = (gas_pressure * 133.322368) / (gas_temp * 1.380649e-23); // Calculates the gas density
+
+    double grid_step = length / grid_size;
+
+    for (int i = 0; i < grid_size; i++){
+        if (i < grid_init || i >= grid_end){
+            eps(i) = epsi * rel_permitivity; // for a e_r|| e_0 || e_r type system
+        }
+    }
 
     // Set values within the specified range to the desired height
-    for (int i = startRange; i < endRange; ++i) {
+    for (int i = grid_init; i < grid_end; ++i) {
         for (int j = 0; j < size_r; j++){
-            ne(j, i) = height;
-            ni(j, i) = height;
+            ne(j, i) = electron_density;
+            gas_dens(j,i) = gas_density;
+
         }   
     }
 
     int react_e[] = {0,0,0,1,1,1,0};
+    int react_Ar[] = {0,-1,1,-1,0,1,1};
+    int react_Ar_star[] = {0,1,-1,0,-1,-2,-1};
+    int react_Ar_plus[] = {0,0,0,1,1,1,0};
 
     Specie electron("e", -1, 511, react_e, ne);
-    Specie ion("i", 1, 511, react_e, ni);
+    Specie argon("Ar", 0, 511, react_Ar, gas_dens);
+    Specie argon_star("Ar_star", 0, 511, react_Ar_star, null);
+    Specie argon_plus("Ar_plus", 1, 511, react_Ar_plus, null);
+
+    //Specie ion("i", 1, 511, react_e, ni);
 
     std::vector<Specie> species;
     species.push_back(electron);
-    species.push_back(ion);
+    species.push_back(argon);
+    species.push_back(argon_star);
+    species.push_back(argon_plus);
 
     // NEW MAIN FROM HERE
 
-    Simulation simul(size_r, size_z, 20.0e-6, 20.0e-6, "cartesian", eps, species);
-
-    PoissonSolver2D solver(10e3,0,0,0,fronteira_livre,sig,simul);
-
-    solver.solve();
-
-    std::cout<<simul.get_Ez1()<<std::endl;
-
+    Simulation simul(size_r, grid_size, 20.0e-6, grid_step, "cartesian", eps, species, grid_init, grid_end, electron_mean_energy, secondary_electron_mean_energy);
     std::ofstream file("rho_data.txt");
-    simul.write_dens(file);
     
     int a = 0;
 
     while (simul.get_t() <= 5e-8) {
+
+        PoissonSolver2D solver(left_potential*cos(frequency * simul.get_t()),right_potential,0,0,fronteira_livre,sig,simul);
+        std::cout <<left_potential*cos(frequency * simul.get_t())<<std::endl;
+        solver.solve();
+        std::cout << simul.get_Ez1()<<std::endl;
+        simul.write_dens(file);
+
         //std::cout <<a<<std::endl;
         a++;
         if (a%100 == 0){
