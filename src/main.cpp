@@ -156,7 +156,7 @@ int main() {
 
     // NEW MAIN FROM HERE
 
-    Simulation simul(size_r, grid_size, 20.0e-6, grid_step, "cartesian", eps, species, grid_init, grid_end, electron_mean_energy, secondary_electron_mean_energy);
+    Simulation simul(size_r, grid_size, 20.0e-6, grid_step, "cartesian", eps, species, grid_init, grid_end, electron_mean_energy, secondary_electron_mean_energy, gas_temp);
     std::ofstream file("rho_data.txt");
     
     int a = 0;

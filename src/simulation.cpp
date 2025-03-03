@@ -30,9 +30,10 @@ Simulation::Simulation(int n, int m, double dr, double dz, std::vector<Specie>& 
 	z_step = dz;
 }
 
-Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Eigen::VectorXd& _eps, std::vector<Specie>& _species, int _grid_init, int _grind_end, double electron_energy, double sec_e_em_energy) : species(_species){
+Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Eigen::VectorXd& _eps, std::vector<Specie>& _species, int _grid_init, int _grind_end, double electron_energy, double sec_e_em_energy, double _gas_temp) : species(_species){
  
 	t = 0;
+	gas_temp = _gas_temp;
 
 	secondary_emission_energy = sec_e_em_energy;
 
@@ -187,12 +188,16 @@ void Simulation::push_time(int int_mode){
 	Eigen::MatrixXd mu = Eigen::MatrixXd::Zero(r_size, z_size);
 	Eigen::MatrixXd De = Eigen::MatrixXd::Zero(r_size, z_size);
 	Eigen::MatrixXd Se = Eigen::MatrixXd::Zero(r_size, z_size);
+	Eigen::MatrixXd e_ener = Eigen::MatrixXd::Zero(r_size, z_size);
 
 	//std::cout <<Ez1<<std::endl;
 
 	for (int i = 0; i < r_size; i++){
 	
-		for (int j = 0; j < z_size; ++j){ 
+		for (int j = 0; j < z_size; ++j){
+
+			e_ener(i,j) = species.back().get_density()(i,j) / (species[0].get_density()(i,j) + 1e-308);
+
 			/*
 			double x;
 			
@@ -216,6 +221,7 @@ void Simulation::push_time(int int_mode){
 			De(i,j) = 0.1;
 		}
 	}
+	std::cout <<e_ener<< std::endl;
 	
 	// Calculate Fluxes at each cell
 
@@ -259,6 +265,33 @@ void Simulation::push_time(int int_mode){
 			for (int i = 0; i < r_size; i++){
 		
 				for (int j = grid_init; j < grid_end; ++j){ // changed from 0 and z _size to 1 and z_size - 1
+
+					double aux_flux = 0;
+
+					if (j == grid_init || j == grid_end - 1){ // Special border cases for fluxes
+
+						if (s.get_name() == species[0].get_name()){
+
+							aux_flux = 0.5 * ne(i,j) * calc_vthermal(s, e_ener(i,j) * 11606.); // Base electron wall fluxes
+
+							for (Specie& ss : species){ // Sum the fluxes of p species
+								if (ss.get_charge() >= 1){
+									aux_flux = aux_flux - 1 * 0.5 * ss.get_density() * calc_vthermal(ss, gas_temp);
+								}
+							}
+
+							aux_flux = aux_flux * S_hori(i,j);
+
+							std::cout<< s.get_name() << j<<std::endl;
+
+						} else if (s.get_name() == species.back().get_name()) {
+
+							std::cout<< s.get_name() << j<< " aaaa"<<std::endl; 
+
+						} else {
+
+						}
+					}
 
 					midfluxn(i,j) =  conv.calcFlux_UNO3(i, j, mu(i,j), De(i,j), dt, 1, s.get_density(), s.get_charge());
 					new_n(i, j) = s.get_density()(i, j) + dt * (midfluxn(i, j)/vols(i, j) + Se(i,j));
@@ -483,4 +516,8 @@ Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Simulation::get_rho(){
 
 Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Simulation::get_Ez1(){
 	return ez1;
+}
+
+double Simulation::calc_vthermal(Specie specie, double temp){
+	return sqrt(8 * 1.380649e-23 * temp / (M_PI * specie.get_mass()));
 }

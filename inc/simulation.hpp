@@ -21,7 +21,7 @@ class Simulation{
 
 		Simulation(int, int, double, double, std::vector<Specie>&); // Constructor with only grid and Dieletric 
 
-		Simulation(int, int, double, double, std::string, Eigen::VectorXd&, std::vector<Specie>&, int, int, double, double); // Constructor with grid, Dieletric and Species
+		Simulation(int, int, double, double, std::string, Eigen::VectorXd&, std::vector<Specie>&, int, int, double, double, double); // Constructor with grid, Dieletric and Species
 
 		void update_charge_density();
 
@@ -70,10 +70,15 @@ class Simulation{
 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> get_Ez1();
 
+		double calc_vthermal(Specie, double);
+
 	private:
 
 		// Time
 		double t;
+
+		// Gas temperature;
+		double gas_temp;
 
 		// Grid size
 		int r_size;
