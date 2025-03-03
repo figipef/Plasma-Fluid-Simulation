@@ -272,11 +272,11 @@ void Simulation::push_time(int int_mode){
 
 						if (s.get_name() == species[0].get_name()){
 
-							aux_flux = 0.5 * ne(i,j) * calc_vthermal(s, e_ener(i,j) * 11606.); // Base electron wall fluxes
+							aux_flux = 0.5 * s.get_density()(i,j) * calc_vthermal(s, e_ener(i,j) * 11606. * 2/3); // Base electron wall fluxes
 
 							for (Specie& ss : species){ // Sum the fluxes of p species
 								if (ss.get_charge() >= 1){
-									aux_flux = aux_flux - 1 * 0.5 * ss.get_density() * calc_vthermal(ss, gas_temp);
+									aux_flux = aux_flux - 1 * 0.5 * ss.get_density()(i,j) * calc_vthermal(ss, gas_temp);
 								}
 							}
 
@@ -286,15 +286,29 @@ void Simulation::push_time(int int_mode){
 
 						} else if (s.get_name() == species.back().get_name()) {
 
+							aux_flux = 2/3 * s.get_density()(i,j) * calc_vthermal(s, e_ener(i,j) * 11606. * 2/3); // Base electron wall fluxes
+
+							for (Specie& ss : species){ // Sum the fluxes of p species
+								if (ss.get_charge() >= 1){
+									aux_flux = aux_flux - 1 * 0.5 * ss.get_density()(i,j) * calc_vthermal(ss, gas_temp) * secondary_emission_energy;
+								}
+							}
+
+							aux_flux = aux_flux * S_hori(i,j);
+
 							std::cout<< s.get_name() << j<< " aaaa"<<std::endl; 
 
-						} else {
+						} else if (s.get_name() == "Ar") {
 
+							aux_flux = -0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j); 
+
+						} else{
+							aux_flux = 0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j);
 						}
 					}
 
 					midfluxn(i,j) =  conv.calcFlux_UNO3(i, j, mu(i,j), De(i,j), dt, 1, s.get_density(), s.get_charge());
-					new_n(i, j) = s.get_density()(i, j) + dt * (midfluxn(i, j)/vols(i, j) + Se(i,j));
+					new_n(i, j) = s.get_density()(i, j) + dt * ((midfluxn(i, j) + aux_flux)/vols(i, j) + Se(i,j));
 				}
 			}
 

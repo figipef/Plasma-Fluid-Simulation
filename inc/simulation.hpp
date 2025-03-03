@@ -89,8 +89,8 @@ class Simulation{
 		double z_step;
 
 		// Grid gas init and end
-		double grid_init;
-		double grid_end;
+		int grid_init;
+		int grid_end;
 
 		// Matrices for geometrical stored values 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> S_hori; // Surfaces
