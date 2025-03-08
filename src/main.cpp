@@ -23,30 +23,6 @@ double epsi =8.85418781762e-12;
 
 double no_epsi = 1;
 
-// Function to perform polynomial fitting
-Eigen::VectorXd polynomialFit(const std::vector<double>& x, const std::vector<double>& y, int degree, bool type) {
-    int n = x.size();
-    Eigen::MatrixXd X(n, degree + 1);
-    Eigen::VectorXd Y(n);
-
-    // Construct the Vandermonde matrix and the Y vector
-    for (int i = 0; i < n; ++i) {
-        Y(i) = y[i];
-        for (int j = 0; j <= degree; ++j) {
-            if (type){
-                X(i, j) = pow(x[i], j);
-            }else{
-                X(i, j) = pow(log(x[i]), j);
-            }   
-            
-        }
-    }
-
-    // Solve for the polynomial coefficients using the normal equation
-    Eigen::VectorXd coeffs = (X.transpose() * X).ldlt().solve(X.transpose() * Y);
-    return coeffs;
-}
-
 int main() {
     std::ifstream input_file("input.txt"); // Open the input file
     if (!input_file) {
@@ -146,6 +122,35 @@ int main() {
     Specie argon_star("Ar_star", 0, 511, react_Ar_star, null);
     Specie argon_plus("Ar_plus", 1, 511, react_Ar_plus, null);
 
+    Specie r1_reag[2] = {electron, argon};
+    Specie r1_prod[2] = {electron, argon_star};
+
+    Chemistry r1 = Chemistry(2,2, r1_reag, r1_prod, 0, 11.5, 4.1e-14, 0.00015, 1.3);
+
+    Specie r2_reag[2] = {electron, argon_star};
+    Specie r2_prod[2] = {electron, argon};
+
+    Chemistry r2 = Chemistry(2,2, r1_reag, r1_prod, 0, -11.5, 4.1e-14, 0.00015, 1.3);
+
+    Specie r3_reag[2] = {electron, argon};
+    Specie r3_prod[2] = {electron, argon_plus};
+
+    Chemistry r3 = Chemistry(2,2, r3_reag, r3_prod, 0, 15.8, 1.4e-13, 0.00008, 1.2);
+
+    double constant_rate_r5 = 3.4e8 /6.022e-23;
+
+    Specie r5_reag[2] = {argon_star, argon_star};
+    Specie r5_prod[3] = {electron, argon, argon_plus};
+
+    Chemistry r5 = Chemistry(2,2, r1_reag, r1_prod, 1, 0, constant_rate_r5, 0, 0);
+
+    double constant_rate_r6 = 1807 /6.022e-23;
+
+    Specie r6_reag[2] = {argon_star, argon};
+    Specie r6_prod[2] = {argon, argon};
+
+    Chemistry r6 = Chemistry(2,2, r3_reag, r3_prod, 1, 0, constant_rate_r6, 0, 0);
+
     //Specie ion("i", 1, 511, react_e, ni);
 
     std::vector<Specie> species;
@@ -154,16 +159,23 @@ int main() {
     species.push_back(argon_star);
     species.push_back(argon_plus);
 
+    std::vector<Chemistry> chemistries; // Stepwise Ionization
+    chemistries.push_back(r1);
+    chemistries.push_back(r2);
+    chemistries.push_back(r3);
+    chemistries.push_back(r5);
+    chemistries.push_back(r6);
+
     // NEW MAIN FROM HERE
 
-    Simulation simul(size_r, grid_size, 20.0e-6, grid_step, "cartesian", eps, species, grid_init, grid_end, electron_mean_energy, secondary_electron_mean_energy, gas_temp);
+    Simulation simul(size_r, grid_size, 20.0e-6, grid_step, "cartesian", eps, species, chemistries, grid_init, grid_end, electron_mean_energy, secondary_electron_mean_energy, gas_temp);
     std::ofstream file("rho_data.txt");
     
     int a = 0;
 
     while (simul.get_t() <= 5e-8) {
 
-        PoissonSolver2D solver(left_potential*cos(frequency * simul.get_t()),right_potential,0,0,fronteira_livre,sig,simul);
+        PoissonSolver2D solver(left_potential*sin(frequency * simul.get_t()),right_potential,0,0,fronteira_livre,sig,simul);
         std::cout <<left_potential*cos(frequency * simul.get_t())<<std::endl;
         solver.solve();
         std::cout << simul.get_Ez1()<<std::endl;

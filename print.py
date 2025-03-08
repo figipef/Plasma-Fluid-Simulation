@@ -4,6 +4,7 @@ import matplotlib.animation as animation
 import math
 from matplotlib.colors import SymLogNorm
 from scipy.optimize import curve_fit
+import re
 
 # Initialize lists to store the columns
 column1 = []
@@ -110,24 +111,53 @@ plt.show()
 column1 = []
 column2 = []
 
+# File path
+file_path = "./chemistry/Bolsig Ar Data.TXT"
+
+with open(file_path, "r") as file:
+    lines = file.readlines()
+# Locate the "Rate coefficients" section
+rate_section = False
+E_N_list = []
+C2_list = []
+C3_list = []
+
+for line in lines:
+    if "Rate coefficients (m3/s)" in line:
+        rate_section = True
+    elif rate_section and re.match(r"^\s*\d+", line):  # Matches data rows
+        parts = line.split()
+        if len(parts) >= 5:
+            E_N_list.append(float(parts[1]))  # Convert to float
+            C2_list.append(float(parts[4]))
+            C3_list.append(float(parts[5]))
+    elif rate_section and line.strip() == "":  # Stop at the next blank line
+        break
+
+# Print lists
+print("E/N List:", E_N_list)
+print("C2 List:", C2_list)
+print("C3 List:", C3_list)
+
 def b(x):
 
-    if x < 10:
-        return 0
-    else:
-        return 1e-13 * (np.exp(-0.5*( np.log(x*0.0001))**2))
+    #if x < 10:
+    #    return 0
+    #else:
+    #return 4.1e-14  * (np.exp(-0.5*( np.log(x*0.00015) / 1.3)**2)) #C2
+    return 1.4e-13  * (np.exp(-0.5*( np.log(x*0.00008) / 1.2)**2)) #C3
 
+print(b(100))
 # Open and read the txt file
 with open("bolsig/N2iorate.txt", "r") as file:
     for line in file:
         # Split each line into two parts
         values = line.split()
         # Convert the values to floats and store them in the respective lists
-        column1.append(float(values[0]))
-        column2.append(float(values[1]))
+        #$column1.append(float(E_N_list))
+        #column2.append(float(C2_list))
 
 x = np.logspace(-3, 4,100)
-
 
 #f = pol(x, coeffs, 3,1)
 f = []
@@ -138,7 +168,7 @@ for i in x:
 
 #print(f)
 plt.plot(x, f)
-plt.scatter(column1, column2)
+plt.scatter(E_N_list, C3_list)
 plt.plot()
 plt.xscale("log")
 #plt.yscale("log")

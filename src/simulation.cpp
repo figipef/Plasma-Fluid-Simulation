@@ -4,16 +4,16 @@
 #include "convection.hpp"
 #include "specie.hpp"
 
-Simulation::Simulation(std::vector<Specie>& _species) : species(_species){	
+Simulation::Simulation(std::vector<Specie>& _species, std::vector<Chemistry>& _chemistries) : species(_species), chemistries(_chemistries){	
 }
 
-Simulation::Simulation(int n, double dz, std::vector<Specie>& _species) : species(_species){
+Simulation::Simulation(int n, double dz, std::vector<Specie>& _species, std::vector<Chemistry>& _chemistries) : species(_species), chemistries(_chemistries){
 	// IN WORK
 	z_size = n;
 	z_step = dz;
 }
 
-Simulation::Simulation(int n, double dz, Eigen::VectorXd _eps, std::vector<Specie>& _species) : species(_species){
+Simulation::Simulation(int n, double dz, Eigen::VectorXd _eps, std::vector<Specie>& _species, std::vector<Chemistry>& _chemistries) : species(_species), chemistries(_chemistries){
 	// IN WORK
 
 	z_size = n;
@@ -21,7 +21,7 @@ Simulation::Simulation(int n, double dz, Eigen::VectorXd _eps, std::vector<Speci
 	eps = _eps;
 }
 
-Simulation::Simulation(int n, int m, double dr, double dz, std::vector<Specie>& _species) : species(_species){
+Simulation::Simulation(int n, int m, double dr, double dz, std::vector<Specie>& _species, std::vector<Chemistry>& _chemistries) : species(_species), chemistries(_chemistries){
 	// IN WORK
 
 	r_size = n;
@@ -30,7 +30,7 @@ Simulation::Simulation(int n, int m, double dr, double dz, std::vector<Specie>& 
 	z_step = dz;
 }
 
-Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Eigen::VectorXd& _eps, std::vector<Specie>& _species, int _grid_init, int _grind_end, double electron_energy, double sec_e_em_energy, double _gas_temp) : species(_species){
+Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Eigen::VectorXd& _eps, std::vector<Specie>& _species, std::vector<Chemistry>& _chemistries, int _grid_init, int _grind_end, double electron_energy, double sec_e_em_energy, double _gas_temp) : species(_species), chemistries(_chemistries){
  
 	t = 0;
 	gas_temp = _gas_temp;
@@ -190,11 +190,10 @@ void Simulation::push_time(int int_mode){
 	Eigen::MatrixXd Se = Eigen::MatrixXd::Zero(r_size, z_size);
 	Eigen::MatrixXd e_ener = Eigen::MatrixXd::Zero(r_size, z_size);
 
-	//std::cout <<Ez1<<std::endl;
 
 	for (int i = 0; i < r_size; i++){
 	
-		for (int j = 0; j < z_size; ++j){
+		for (int j = grid_init; j < grid_end; ++j){
 
 			e_ener(i,j) = species.back().get_density()(i,j) / (species[0].get_density()(i,j) + 1e-308);
 
@@ -300,9 +299,10 @@ void Simulation::push_time(int int_mode){
 
 						} else if (s.get_name() == "Ar") {
 
-							aux_flux = -0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j); 
+							aux_flux = -0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j); // Probably needs to be the sum of the excited and charged species
 
 						} else{
+
 							aux_flux = 0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j);
 						}
 					}

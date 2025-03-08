@@ -1,6 +1,7 @@
 #pragma once
 
 #include "specie.hpp"
+#include "chemistry.hpp"
 
 #include <string>
 #include <cmath>
@@ -13,15 +14,15 @@ class Simulation{
 
 	public:
 
-		Simulation(std::vector<Specie>&); // Default constructor
+		Simulation(std::vector<Specie>&, std::vector<Chemistry>&); // Default constructor
 
-		Simulation(int, double, std::vector<Specie>&);
+		Simulation(int, double, std::vector<Specie>&, std::vector<Chemistry>&);
 
-		Simulation(int, double, Eigen::VectorXd,std::vector<Specie>&);
+		Simulation(int, double, Eigen::VectorXd,std::vector<Specie>&, std::vector<Chemistry>&);
 
-		Simulation(int, int, double, double, std::vector<Specie>&); // Constructor with only grid and Dieletric 
+		Simulation(int, int, double, double, std::vector<Specie>&, std::vector<Chemistry>&); // Constructor with only grid and Dieletric 
 
-		Simulation(int, int, double, double, std::string, Eigen::VectorXd&, std::vector<Specie>&, int, int, double, double, double); // Constructor with grid, Dieletric and Species
+		Simulation(int, int, double, double, std::string, Eigen::VectorXd&, std::vector<Specie>&, std::vector<Chemistry>&, int, int, double, double, double); // Constructor with grid, Dieletric and Species
 
 		void update_charge_density();
 
@@ -105,6 +106,9 @@ class Simulation{
 
 		// Species included in the Simulation
 		std::vector<Specie>& species;
+
+		// Reactions included in the Simulation
+		std::vector<Chemistry>& chemistries;
 
 		// Electron emission energies
 		double secondary_emission_energy;

@@ -1,22 +1,36 @@
 #pragma once
 
+#include "Specie.hpp"
+
 #include <fstream>
 #include <iostream>
+#include <cmath>
 
-class chemistry{
+class Chemistry{
 
 	public:
 
-		chemistry(int n_species, int n_reactions);
+		Chemistry(int, int, Specie*, Specie*, int, double, double, double, double); // n_reagets, n_products, reagents, products, reaction delta energy
 
-		double calc_reaction_rate();
+		double calc_reaction_rate(double);
 
 		double setup_species_react_net(std::ofstream&);
 
-	private:
+		Specie* reagents;
 
-		double *reaction_rates; // For each reaction (i)
+		int n_reagents;
 
-		int **species_react_net; // For each species (i) save the net gain/loss for each reaction (j)
+		Specie* products;
+
+		int n_products;
+
+		double react_energy_delta; // In eV !!!
+
+		// used for the reaction rates a1  * (exp(-0.5*( log(x*a2) / a3)**2))
+		double a1;
+		double a2;
+		double a3;
+
+		int type; // If it is constant or not!!
 
 };
