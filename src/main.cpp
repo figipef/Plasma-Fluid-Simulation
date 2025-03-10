@@ -111,10 +111,15 @@ int main() {
         }   
     }
 
-    int react_e[] = {0,0,0,1,1,1,0};
-    int react_Ar[] = {0,-1,1,-1,0,1,1};
-    int react_Ar_star[] = {0,1,-1,0,-1,-2,-1};
-    int react_Ar_plus[] = {0,0,0,1,1,1,0};
+    //int react_e[] = {0,0,0,1,1,1,0}; // Real reactions
+    //int react_Ar[] = {0,-1,1,-1,0,1,1};
+    //int react_Ar_star[] = {0,1,-1,0,-1,-2,-1};
+    //int react_Ar_plus[] = {0,0,0,1,1,1,0};
+
+    int react_e[] = {0,0,1,1,0}; // Reactions being considered rn are 2,3,4,6,7
+    int react_Ar[] = {-1,1,-1,1,1};
+    int react_Ar_star[] = {1,-1,0,-2,-1};
+    int react_Ar_plus[] = {0,0,1,1,0};
 
     Specie electron("e", -1, 511, react_e, ne);
     Specie argon("Ar", 0, 511, react_Ar, gas_dens);

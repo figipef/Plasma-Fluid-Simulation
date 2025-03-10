@@ -201,6 +201,10 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
 	Eigen::MatrixXd Se = Eigen::MatrixXd::Zero(r_size, z_size);
 	Eigen::MatrixXd e_ener = Eigen::MatrixXd::Zero(r_size, z_size);
 
+	Eigen::MatrixXd electron_fluxes = Eigen::MatrixXd::Zero(r_size, z_size); // To be used by electron energy after
+
+	std::vector<Eigen::MatrixXd> reaction_matrix; // Reaction matrix list
+
 	//std::vector<DataPoint> dif_data = { // Difusion data
     //    {0.001678, 1.092e+25}, {0.002221, 2.196e+25}, {0.003451, 3.298e+25}, 
     //    {0.007177, 3.861e+25}, {0.01671, 3.777e+25}, {0.03987, 3.272e+25}, 
@@ -210,11 +214,25 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
     //    {3075.0, 1.362e+25}, {4442.0, 1.893e+25}, {6182.0, 2.686e+25}
     //};
 
+	// Fill the reactions matrices
+	for (Chemistry& c : chemistries){ 
+		Eigen::MatrixXd mat = Eigen::MatrixXd::Zero(r_size, z_size);
+		reaction_matrix.push_back(mat);
+	}
+
 	for (int i = 0; i < r_size; i++){
 	
 		for (int j = grid_init; j < grid_end; ++j){
 
 			e_ener(i,j) = species.back().get_density()(i,j) / (species[0].get_density()(i,j) + 1e-308);
+
+			// Set the values of the reaction matrix using the electron energy
+			int counter = 0;
+			for (Chemistry& c : chemistries){ // Cycle through the reactions to calculate (8)
+
+				reaction_matrix[counter](i,j) = c.calc_reaction_rate(e_ener(i,j)) * c.reagents[0].get_density()(i,j) * c.reagents[1].get_density()(i,j); // Calculate R_i for each reaction
+				counter++;
+			}
 
 			double x;
 			
@@ -225,7 +243,7 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
 			}else{
 				x = std::abs((ez1(i,j) + ez1(i,j-1))/2 / (gas_dens) * 1e21);
 			}
-			std::cout <<x<<"\n";
+			//std::cout <<x<<"\n";
 			/* DIFFUSION COEFFECIENT CALCULATION THROUGH LIN INTERPOLATION
 			double dif_coef = 0;
 
@@ -301,14 +319,14 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
 		counter++;
 
 		if (s.get_name() == species[0].get_name()){
-			s.set_mob_coef(mu);
-			s.set_dif_coef(De);
+			s.update_mob_coef(mu);
+			s.update_dif_coef(De);
 		} else if (s.get_name() == species.back().get_name()) {
-			s.set_mob_coef(mu_energy);
-			s.set_dif_coef(De_energy);
+			s.update_mob_coef(mu_energy);
+			s.update_dif_coef(De_energy);
 		} else {
-			s.set_mob_coef(mu_gas);
-			s.set_dif_coef(De_gas);
+			s.update_mob_coef(mu_gas);
+			s.update_dif_coef(De_gas);
 		}
 
 		Eigen::MatrixXd new_n = Eigen::MatrixXd::Zero(r_size, z_size);
@@ -320,6 +338,17 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
 			for (int i = 0; i < r_size; i++){
 		
 				for (int j = grid_init; j < grid_end; ++j){ // changed from 0 and z _size to 1 and z_size - 1
+
+					// Calculate the Reactions at the cell i,j
+					double temp_S = 0; // temporary sum dummy variable
+					int counter = 0;
+					for (Chemistry& c : chemistries){ // Cycle through the reactions to calculate (8)
+
+						temp_S = temp_S + s.react_net[counter] * reaction_matrix[counter](i,j); // Calculate R_i for each reaction
+						counter++;
+					}
+
+					Se(i,j) = temp_S;
 
 					double aux_flux = 0;
 
@@ -377,9 +406,23 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
 						}
 					}
 
-					midfluxn(i,j) =  conv.calcFlux_UNO3(i, j, s.get_mob_coef(), s.get_dif_coef(), dt, 1, s.get_density(), s.get_charge());
+					if (s.get_name() == species.back().get_name()) { // Calculate the Creation for the electron energy
+
+						double temp_sum = 0;
+
+						for (Chemistry& c : chemistries){ // Cycle through the reactions to calculate (8)
+							temp_sum = temp_sum + c.calc_reaction_rate(e_ener(i,j)) * c.reagents[1].get_density()(i,j) * c.react_energy_delta; 
+						}
+
+						Se(i,j) = - electron_fluxes(i,j) * ez1(i,j) * 1.6e-19 - species[0].get_density()(i,j) * temp_sum;
+					}
+
+					midfluxn(i,j) =  conv.calcFlux_UNO3(i, j, s.get_mob_coef()(i,j), s.get_dif_coef()(i,j), dt, 1, s.get_density(), s.get_charge());
 					new_n(i, j) = s.get_density()(i, j) + dt * ((midfluxn(i, j) + aux_flux)/vols(i, j) + Se(i,j));
-					
+
+					if (s.get_name() == species[0].get_name()){
+						electron_fluxes(i,j) = midfluxn(i, j) + aux_flux; // Save the electron fluxes to calculate the electron energy creation 
+					}
 				}
 			}
 

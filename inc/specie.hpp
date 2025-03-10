@@ -33,6 +33,8 @@ class Specie{
 
 		void update_dif_coef(Eigen::MatrixXd&);
 
+		int *react_net; // net value for each reaction in the array form
+
 	private:
 
 		std::string name;
@@ -40,8 +42,6 @@ class Specie{
 		int charge; // whole units
 
 		double mass;
-
-		int *react_net; // net value for each reaction in the array form
 
 		double qm_ratio; // charge mass ratio may be needed for some calculations
 
