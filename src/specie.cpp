@@ -37,6 +37,22 @@ Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Specie::get_density(){
 	return n;
 }
 
+Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Specie::get_mob_coef(){
+	return mu;
+}
+
+Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Specie::get_dif_coef(){
+	return De;
+}
+
 void Specie::update_density(Eigen::MatrixXd& new_n){
 	n = new_n;
+}
+
+void Specie::update_mob_coef(Eigen::MatrixXd& new_mu){
+	mu = new_mu;
+}
+
+void Specie::update_dif_coef(Eigen::MatrixXd& new_De){
+	De = new_De;
 }

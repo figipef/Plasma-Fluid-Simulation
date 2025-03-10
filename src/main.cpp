@@ -1,12 +1,11 @@
 //#include "placeholder.hpp"
 //#include "poisson1DCart.hpp"
-#include "poisson2DCyl.hpp"
+//#include "poisson2DCyl.hpp"
 #include "specie.hpp"
 #include "chemistry.hpp"
 #include "simulation.hpp"
 #include "poissonsolver2d.hpp"
 #include "convection.hpp"
-
 
 #include <cmath>
 #include <vector>
@@ -94,7 +93,7 @@ int main() {
     Eigen::VectorXd sig = Eigen::VectorXd::Constant(grid_size, 0);
 
     double gas_density = (gas_pressure * 133.322368) / (gas_temp * 1.380649e-23); // Calculates the gas density
-
+    std::cout <<"gas dens: " <<gas_density<<"\n";
     double grid_step = length / grid_size;
 
     for (int i = 0; i < grid_size; i++){
@@ -153,6 +152,7 @@ int main() {
 
     //Specie ion("i", 1, 511, react_e, ni);
 
+    // ALWAYS ADD THE ELECTRONS FIRST
     std::vector<Specie> species;
     species.push_back(electron);
     species.push_back(argon);
@@ -168,7 +168,7 @@ int main() {
 
     // NEW MAIN FROM HERE
 
-    Simulation simul(size_r, grid_size, 20.0e-6, grid_step, "cartesian", eps, species, chemistries, grid_init, grid_end, electron_mean_energy, secondary_electron_mean_energy, gas_temp);
+    Simulation simul(size_r, grid_size, 20.0e-6, grid_step, "cartesian", eps, species, chemistries, grid_init, grid_end, electron_mean_energy, secondary_electron_mean_energy, gas_temp, gas_density, gas_pressure);
     std::ofstream file("rho_data.txt");
     
     int a = 0;
@@ -176,18 +176,25 @@ int main() {
     while (simul.get_t() <= 5e-8) {
 
         PoissonSolver2D solver(left_potential*sin(frequency * simul.get_t()),right_potential,0,0,fronteira_livre,sig,simul);
-        std::cout <<left_potential*cos(frequency * simul.get_t())<<std::endl;
+        //std::cout <<left_potential*sin(frequency * simul.get_t())<<std::endl;
+        double j_left = 0;
+        double j_right = 0;
         solver.solve();
         std::cout << simul.get_Ez1()<<std::endl;
         simul.write_dens(file);
 
         //std::cout <<a<<std::endl;
         a++;
+        double old_t = simul.get_t();
         if (a%100 == 0){
             std::cout<< "time "<<simul.get_t()<<std::endl;
         }
-        simul.push_time(0);
-        solver.solve();
+        simul.push_time(0, j_left, j_right);
+
+        double dt = simul.get_t() - old_t; // Get the time step for the sigma calculation
+
+        sig(grid_init - 1) = sig(grid_init - 1) + dt * j_left; // Check com o professor se faz sentido
+        sig(grid_end - 1) = sig(grid_end - 1) + dt * j_right;
     }
     std::cout<< "iter "<<a<<std::endl;
     simul.write_dens(file);

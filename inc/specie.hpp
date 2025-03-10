@@ -23,7 +23,15 @@ class Specie{
 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> get_density();
 
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> get_mob_coef();
+
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> get_dif_coef();
+
 		void update_density(Eigen::MatrixXd&);
+
+		void update_mob_coef(Eigen::MatrixXd&);
+
+		void update_dif_coef(Eigen::MatrixXd&);
 
 	private:
 
@@ -38,4 +46,8 @@ class Specie{
 		double qm_ratio; // charge mass ratio may be needed for some calculations
 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> n; // density (m^-3)
+
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> mu; // mobility coefiecients (SI)
+
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> De; // diffusion coeficients (SI)
 };

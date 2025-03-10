@@ -10,6 +10,8 @@ import re
 column1 = []
 column2 = []
 
+print(1.380649e-23 * 300 / (1.9e-19))
+
 # Open and read the txt file
 with open("bolsig/N2mob.txt", "r") as file:
     for line in file:
@@ -20,31 +22,6 @@ with open("bolsig/N2mob.txt", "r") as file:
         column2.append(float(values[1]))
 
 x = np.logspace(-3, 4,100)
-
-def arctan(x,a,b,c,d):
-    return a * np.arctan(np.log10(x) * b - c) + d
-
-# Fit the data with free parameters
-popt, pcov = curve_fit(
-    arctan, 
-    column1, 
-    column2, 
-    p0=[-1e25, 1, -5,1e25]  # Initial guesses for a, b, and c
-)
-
-# Extract fitted parameters
-a_fit, b_fit, c_fit, d_fit = popt
-print(a_fit, b_fit, c_fit, d_fit)
-
-#print(f)
-plt.plot(x, arctan(x, a_fit, b_fit, c_fit, d_fit), 
-         label=f'Fitted arctan: a={a_fit:.2e}, b={b_fit:.2e}, c={c_fit:.2e}', 
-         color='red')
-plt.scatter(column1, column2)
-plt.plot()
-plt.xscale("log")
-plt.yscale("log")
-plt.show()
 
 coeffs = [ 4.19038e+024,
 -2.50599e+024,
@@ -97,7 +74,6 @@ a1,a2,b2,c2,d2,a3,b3,c3,d3,e3,a4,b4,c4 = p0
 print(a1,a2,b2,c2,d2,a3,b3,c3,d3,e3,a4,b4,c4)
 
 plt.plot(x, difusion(x,a1,a2,b2,c2,d2,a3,b3,c3,d3,e3,a4,b4,c4), 
-         label=f'Fitted arctan: a={a_fit:.2e}, b={b_fit:.2e}, c={c_fit:.2e}', 
          color='red')
 plt.scatter(column1, column2)
 plt.plot()
@@ -118,13 +94,18 @@ with open(file_path, "r") as file:
     lines = file.readlines()
 # Locate the "Rate coefficients" section
 rate_section = False
+transport_section = False
 E_N_list = []
 C2_list = []
 C3_list = []
 
+Mobility_list = []
+Difusion_list = []
+
 for line in lines:
     if "Rate coefficients (m3/s)" in line:
         rate_section = True
+
     elif rate_section and re.match(r"^\s*\d+", line):  # Matches data rows
         parts = line.split()
         if len(parts) >= 5:
@@ -134,45 +115,124 @@ for line in lines:
     elif rate_section and line.strip() == "":  # Stop at the next blank line
         break
 
+
+for line in lines:
+    if "Transport coefficients" in line:
+        transport_section = True
+
+    elif transport_section and re.match(r"^\s*\d+", line):  # Matches data rows
+        parts = line.split()
+        if len(parts) >= 6:
+            #E_N_list.append(float(parts[1]))  # Convert to float
+            Mobility_list.append(float(parts[3]))
+            Difusion_list.append(float(parts[4]))
+    elif transport_section and line.strip() == "":  # Stop at the next blank line
+        break
+
+
 # Print lists
-print("E/N List:", E_N_list)
+print("E/N List:", E_N_list[2:])
 print("C2 List:", C2_list)
 print("C3 List:", C3_list)
 
-def b(x):
+print("E/N List:", E_N_list[2:])
+print("Mobility List:", Mobility_list)
+print("Difusion List:", Difusion_list)
 
-    #if x < 10:
-    #    return 0
-    #else:
+def arctan(x,a,b,c,d): # For the mobility
+    return a * np.arctan(np.log10(x) * b - c) + d
+
+def b(x,a,b,c,d): # For the Ionization Rates
+
     #return 4.1e-14  * (np.exp(-0.5*( np.log(x*0.00015) / 1.3)**2)) #C2
-    return 1.4e-13  * (np.exp(-0.5*( np.log(x*0.00008) / 1.2)**2)) #C3
+    #return 1.4e-13  * (np.exp(-0.5*( np.log(x*0.00008) / 1.2)**2)) #C3
+    #return a  * (np.exp(-0.5*( np.log(x*b) / c)**2)) # General
 
-print(b(100))
-# Open and read the txt file
-with open("bolsig/N2iorate.txt", "r") as file:
-    for line in file:
-        # Split each line into two parts
-        values = line.split()
-        # Convert the values to floats and store them in the respective lists
-        #$column1.append(float(E_N_list))
-        #column2.append(float(C2_list))
+    #return a  * (np.exp(b*( np.log(x))**2)) + c # General
+    return a  * (np.exp(-0.5*( (np.log(x*b)+ d) / c)**2)) # General
 
+def cubic(x,a,b,c,d,e):
+
+    return a*np.exp(b*np.log(x)**3 + c*np.log(x)**2+d*np.log(x)) + e
+
+# Fit the data with free parameters
+poptC2, pcov = curve_fit(
+    b, 
+    E_N_list[2:], 
+    C2_list[2:], 
+    p0=[ 1.4e-13, 0.00008, 1.6,0]  # Initial guesses for a, b, and c
+)
+
+# Fit the data with free parameters
+poptC3, pcov = curve_fit(
+    b, 
+    E_N_list[2:], 
+    C3_list[2:], 
+    p0=[1.4e-13, 0.00008, 1.6,0]  # Initial guesses for a, b, and c
+)
+
+# Extract fitted parameters
+a_fitC2, b_fitC2, c_fitC2,d = poptC2
+a_fitC3, b_fitC3, c_fitC3,d3 = poptC3
+
+print("C2 optimal values: ", poptC2)
+print("C3 optimal values: ", poptC3)
 x = np.logspace(-3, 4,100)
 
-#f = pol(x, coeffs, 3,1)
-f = []
-for i in x:
-    #print(i)
-    #print(dif(i))
-    f.append(float(b(i)))
+plt.plot(x, b(x, a_fitC2, b_fitC2, c_fitC2,d))
+plt.scatter(E_N_list, C2_list)
+plt.plot()
+plt.xscale("log")
+#plt.yscale("log")
 
-#print(f)
-plt.plot(x, f)
+plt.show()
+#print(b(x, a_fitC3, b_fitC3, c_fitC3,d3))
+plt.plot(x, b(x, a_fitC3, b_fitC3, c_fitC3,d3))
 plt.scatter(E_N_list, C3_list)
 plt.plot()
 plt.xscale("log")
 #plt.yscale("log")
 
+plt.show()
+
+# Fit the data with free parameters
+popt, pcov = curve_fit(
+    arctan, 
+    E_N_list[2:], 
+    Mobility_list[2:], 
+    p0=[-1e25, 1, -5,1e25]  # Initial guesses for a, b, and c
+)
+
+# Extract fitted parameters
+a_fit, b_fit, c_fit, d_fit = popt
+print(a_fit, b_fit, c_fit, d_fit)
+
+#print(f)
+plt.plot(x, arctan(x, a_fit, b_fit, c_fit, d_fit), 
+         label=f'Fitted arctan: a={a_fit:.2e}, b={b_fit:.2e}, c={c_fit:.2e}', 
+         color='red')
+plt.scatter(E_N_list, Mobility_list)
+plt.plot()
+plt.xscale("log")
+plt.yscale("log")
+plt.show()
+
+# Fit the data with free parameters
+poptcubic, pcov = curve_fit(
+    cubic, 
+    E_N_list[2:], 
+    Difusion_list[2:], 
+    p0=[ 1.4e25, 1e-1, -6e-1,-3e-1 , -3e-0],  # Initial guesses for a, b, and c
+    maxfev=5000
+)
+
+a_fit, b_fit, c_fit, d_fit, e_fit = poptcubic
+print("Cubic: ",poptcubic)
+plt.plot(x, cubic(x,a_fit, b_fit, c_fit, d_fit, e_fit))
+plt.scatter(E_N_list, Difusion_list)
+plt.plot()
+plt.xscale("log")
+plt.yscale("log")
 plt.show()
 
 #plt.plot(x,lst1D[int(i*50):int(i*350)], color= "blue", label="current test")

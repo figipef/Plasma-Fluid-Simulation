@@ -30,7 +30,7 @@ Simulation::Simulation(int n, int m, double dr, double dz, std::vector<Specie>& 
 	z_step = dz;
 }
 
-Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Eigen::VectorXd& _eps, std::vector<Specie>& _species, std::vector<Chemistry>& _chemistries, int _grid_init, int _grind_end, double electron_energy, double sec_e_em_energy, double _gas_temp) : species(_species), chemistries(_chemistries){
+Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Eigen::VectorXd& _eps, std::vector<Specie>& _species, std::vector<Chemistry>& _chemistries, int _grid_init, int _grind_end, double electron_energy, double sec_e_em_energy, double _gas_temp, double _gas_dens, double _gas_pres) : species(_species), chemistries(_chemistries), gas_dens(_gas_dens), gas_pres(_gas_pres){
  
 	t = 0;
 	gas_temp = _gas_temp;
@@ -180,16 +180,35 @@ void Simulation::update_charge_density(){
 	}
 }
 
-void Simulation::push_time(int int_mode){
+void Simulation::push_time(int int_mode, double& j_l, double& j_r){
 
 	Convection conv(z_step, z_size, S_hori, ez1);
 	double dt;
 
+	// To calculate the electron temperature
+	const double k_B = 8.617333e-5;  // Boltzmann constant in eV/K
+    const double e = 1.602176634e-19; // Elementary charge in C
+
 	Eigen::MatrixXd mu = Eigen::MatrixXd::Zero(r_size, z_size);
 	Eigen::MatrixXd De = Eigen::MatrixXd::Zero(r_size, z_size);
+
+	Eigen::MatrixXd mu_energy = Eigen::MatrixXd::Zero(r_size, z_size);
+	Eigen::MatrixXd De_energy = Eigen::MatrixXd::Zero(r_size, z_size);
+
+	Eigen::MatrixXd mu_gas = Eigen::MatrixXd::Zero(r_size, z_size);
+	Eigen::MatrixXd De_gas = Eigen::MatrixXd::Zero(r_size, z_size);
+
 	Eigen::MatrixXd Se = Eigen::MatrixXd::Zero(r_size, z_size);
 	Eigen::MatrixXd e_ener = Eigen::MatrixXd::Zero(r_size, z_size);
 
+	//std::vector<DataPoint> dif_data = { // Difusion data
+    //    {0.001678, 1.092e+25}, {0.002221, 2.196e+25}, {0.003451, 3.298e+25}, 
+    //    {0.007177, 3.861e+25}, {0.01671, 3.777e+25}, {0.03987, 3.272e+25}, 
+    //    {0.09591, 2.646e+25}, {0.2593, 2.074e+25}, {1.902, 1.607e+25}, 
+    //    {14.64, 1.23e+25}, {74.43, 8.949e+24}, {260.3, 6.922e+24}, 
+    //    {647.5, 6.551e+24}, {1240.0, 7.629e+24}, {2032.0, 9.983e+24}, 
+    //    {3075.0, 1.362e+25}, {4442.0, 1.893e+25}, {6182.0, 2.686e+25}
+    //};
 
 	for (int i = 0; i < r_size; i++){
 	
@@ -197,31 +216,57 @@ void Simulation::push_time(int int_mode){
 
 			e_ener(i,j) = species.back().get_density()(i,j) / (species[0].get_density()(i,j) + 1e-308);
 
-			/*
 			double x;
 			
-			if (j == 0){
-				x = std::abs(Ez1(i,j) / (2.43e25) * 1e21);
-			}else if (j == z_size - 1){
-				x = std::abs(Ez1(i,j-1) / (2.43e25) * 1e21);
+			if (j == grid_init){
+				x = std::abs(ez2(i,j) / (gas_dens) * 1e21);
+			}else if (j == grid_end - 1){
+				x = std::abs(ez1(i,j-1) / (gas_dens) * 1e21);
 			}else{
-				x = std::abs((Ez1(i,j) + Ez1(i,j-1))/2 / (2.43e25) * 1e21);
+				x = std::abs((ez1(i,j) + ez1(i,j-1))/2 / (gas_dens) * 1e21);
 			}
+			std::cout <<x<<"\n";
+			/* DIFFUSION COEFFECIENT CALCULATION THROUGH LIN INTERPOLATION
+			double dif_coef = 0;
 
+			// Find the two data points surrounding x
+    		for (size_t i = 0; i < dif_data.size() - 1; ++i) {
+    		    if (x >= dif_data[i].x && x <= dif_data[i + 1].x) {
+    		        // Interpolate between data[i] and data[i + 1]
+    		        double x0 = dif_data[i].x;
+    		        double y0 = dif_data[i].y;
+    		        double x1 = dif_data[i + 1].x;
+    		        double y1 = dif_data[i + 1].y;
+            
+    		        // Perform the linear interpolation
+    		        dif_coef = y0 + (x - x0) * (y1 - y0) / (x1 - x0);
+    		    } else if (x <= dif_data[0].x){
+    		    	dif_coef = 0;
+    		    } else if (x >= dif_data[dif_data.size() - 1].x){
+    		    	dif_coef = 0;
+    		    }
+    		}
+			*/ 
+			//mu(i,j) = Pol(x, 0)/2.43e25;
+			mu(i,j) = (-1.0475e26* std::atan(std::log10(x) * 2.59783 - 4.66191) + 1.5733318e26)/gas_dens;
+			De(i,j) = mu(i,j) * e_ener(i,j) * 2/3;
+
+			mu_energy(i,j) = mu(i,j) * 5/3;
+			De_energy(i,j) = mu_energy(i,j) * e_ener(i,j) * 2/3;
+
+			mu_gas(i,j) = 0.12/gas_pres;
+			//De(i,j) = dif_coef/gas_dens; 
+
+			//Se(i,j) = Pol(x, 2) * 2.43e25 * ne(i,j); 
 			
-
-			mu(i,j) = Pol(x, 0)/2.43e25;
-
-			De(i,j) = Pol(x, 1)/2.43e25; 
-
-			Se(i,j) = Pol(x, 2) * 2.43e25 * ne(i,j); 
-			*/
-			mu(i,j) = 0.03;
-			De(i,j) = 0.1;
+			//mu(i,j) = 0.03;
+			//De(i,j) = 0.1;
 		}
 	}
-	std::cout <<e_ener<< std::endl;
-	
+	//std::cout <<e_ener<< std::endl;
+	std::cout <<mu<<"\n";
+
+	std::cout <<De<<"\n";
 	// Calculate Fluxes at each cell
 
 	double vr_max = 1e-308;
@@ -255,6 +300,17 @@ void Simulation::push_time(int int_mode){
 
 		counter++;
 
+		if (s.get_name() == species[0].get_name()){
+			s.set_mob_coef(mu);
+			s.set_dif_coef(De);
+		} else if (s.get_name() == species.back().get_name()) {
+			s.set_mob_coef(mu_energy);
+			s.set_dif_coef(De_energy);
+		} else {
+			s.set_mob_coef(mu_gas);
+			s.set_dif_coef(De_gas);
+		}
+
 		Eigen::MatrixXd new_n = Eigen::MatrixXd::Zero(r_size, z_size);
 		Eigen::MatrixXd new_new_n = Eigen::MatrixXd::Zero(r_size, z_size);
 		Eigen::MatrixXd midfluxn = Eigen::MatrixXd::Zero(r_size, z_size);
@@ -271,6 +327,8 @@ void Simulation::push_time(int int_mode){
 
 						if (s.get_name() == species[0].get_name()){
 
+							// For the electrons
+
 							aux_flux = 0.5 * s.get_density()(i,j) * calc_vthermal(s, e_ener(i,j) * 11606. * 2/3); // Base electron wall fluxes
 
 							for (Specie& ss : species){ // Sum the fluxes of p species
@@ -284,6 +342,8 @@ void Simulation::push_time(int int_mode){
 							std::cout<< s.get_name() << j<<std::endl;
 
 						} else if (s.get_name() == species.back().get_name()) {
+							
+							// For the electron energy density specie
 
 							aux_flux = 2/3 * s.get_density()(i,j) * calc_vthermal(s, e_ener(i,j) * 11606. * 2/3); // Base electron wall fluxes
 
@@ -297,6 +357,8 @@ void Simulation::push_time(int int_mode){
 
 							std::cout<< s.get_name() << j<< " aaaa"<<std::endl; 
 
+						// For the other species
+
 						} else if (s.get_name() == "Ar") {
 
 							aux_flux = -0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j); // Probably needs to be the sum of the excited and charged species
@@ -305,10 +367,19 @@ void Simulation::push_time(int int_mode){
 
 							aux_flux = 0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j);
 						}
+
+						if (j == grid_init){
+							j_l = j_l + aux_flux * s.get_charge() * 1.6e-19; // Can be optimized if the real value of charge is saved in Specie 
+						}
+
+						if (j == grid_end - 1){
+							j_r = j_r + aux_flux * s.get_charge() * 1.6e-19; // Can be optimized if the real value of charge is saved in Specie 
+						}
 					}
 
-					midfluxn(i,j) =  conv.calcFlux_UNO3(i, j, mu(i,j), De(i,j), dt, 1, s.get_density(), s.get_charge());
+					midfluxn(i,j) =  conv.calcFlux_UNO3(i, j, s.get_mob_coef(), s.get_dif_coef(), dt, 1, s.get_density(), s.get_charge());
 					new_n(i, j) = s.get_density()(i, j) + dt * ((midfluxn(i, j) + aux_flux)/vols(i, j) + Se(i,j));
+					
 				}
 			}
 
@@ -535,3 +606,4 @@ Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Simulation::get_Ez1(){
 double Simulation::calc_vthermal(Specie specie, double temp){
 	return sqrt(8 * 1.380649e-23 * temp / (M_PI * specie.get_mass()));
 }
+

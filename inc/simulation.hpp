@@ -22,11 +22,11 @@ class Simulation{
 
 		Simulation(int, int, double, double, std::vector<Specie>&, std::vector<Chemistry>&); // Constructor with only grid and Dieletric 
 
-		Simulation(int, int, double, double, std::string, Eigen::VectorXd&, std::vector<Specie>&, std::vector<Chemistry>&, int, int, double, double, double); // Constructor with grid, Dieletric and Species
+		Simulation(int, int, double, double, std::string, Eigen::VectorXd&, std::vector<Specie>&, std::vector<Chemistry>&, int, int, double, double, double, double, double); // Constructor with grid, Dieletric and Species
 
 		void update_charge_density();
 
-		void push_time(int);
+		void push_time(int, double&, double&);
 
 		void write_dens(std::ofstream&);
 
@@ -80,6 +80,12 @@ class Simulation{
 
 		// Gas temperature;
 		double gas_temp;
+
+		// Gas density
+		double gas_dens;
+
+		// Gas pressure
+		double gas_pres;
 
 		// Grid size
 		int r_size;
@@ -135,4 +141,10 @@ class Simulation{
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> ez1; // Horizontal Eletric Field on the left
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> ez2; // Horizontal Eletric Field on the right
 
+};
+
+// Structure to store data points (x, y)
+struct DataPoint {
+    double x;
+    double y;
 };
