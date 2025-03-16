@@ -397,7 +397,7 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
 							aux_flux = 0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j);
 						}
 
-						if (j == grid_init){
+						if (j == grid_init){ // Verificar que nao é feito na energia eletronica
 							j_l = j_l + aux_flux * s.get_charge() * 1.6e-19; // Can be optimized if the real value of charge is saved in Specie 
 						}
 
