@@ -148,14 +148,14 @@ double Convection::calcFlux_superbee(int i , int j ,double mu, double De, double
     return (flux_left - flux_right)*S_hori(i,j);    
 }
 
-double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt, int currlim, Eigen::MatrixXd n, int charge){
+double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt, int currlim, Eigen::MatrixXd n, int charge, int grid_init, int grid_end){
 	double EPS0 = 8.85418781762e-12;
 	double ECHARGE = 1.6e-19;
 
 	double flux_left = 0.0;
 	double flux_right = 0.0;
     
-	if (j == 0) { // Só precisamos de ne
+	if (j == grid_init) { // Só precisamos de ne
 		double g_c;
 		double g_dc;
 		double g_cu;
@@ -192,7 +192,7 @@ double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt,
         	}
         }
         
-    } else if (j == z_size - 1) { // Só precisamos de nw
+    } else if (j == grid_end - 1) { // Só precisamos de nw
     	double g_c;
 		double g_dc;
 		double g_cu;

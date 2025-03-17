@@ -51,7 +51,8 @@ Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Ei
 		int fill[] = {0};
 		if (s.get_name() == "e"){
 			Eigen::MatrixXd temp_matrix = s.get_density() * electron_energy;
-			Specie electron_ener("e_energy", -1, 511, fill, temp_matrix);
+			//Specie electron_ener("e_energy", -1, 511, fill, temp_matrix);
+			Specie electron_ener("e_energy", -1, 9.1093837e-31, fill, temp_matrix); // Initialize the electron energy as a new specie
 			species.push_back(electron_ener);
 		}
 	}
@@ -180,7 +181,7 @@ void Simulation::update_charge_density(){
 	}
 }
 
-void Simulation::push_time(int int_mode, double& j_l, double& j_r){
+void Simulation::push_time(int int_mode, double& j_l, double& j_r, Eigen::MatrixXd& last_flux){
 
 	Convection conv(z_step, z_size, S_hori, ez1);
 	double dt;
@@ -229,7 +230,6 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
 			// Set the values of the reaction matrix using the electron energy
 			int counter = 0;
 			for (Chemistry& c : chemistries){ // Cycle through the reactions to calculate (8)
-
 				reaction_matrix[counter](i,j) = c.calc_reaction_rate(e_ener(i,j)) * c.reagents[0].get_density()(i,j) * c.reagents[1].get_density()(i,j); // Calculate R_i for each reaction
 				counter++;
 			}
@@ -266,7 +266,8 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
     		}
 			*/ 
 			//mu(i,j) = Pol(x, 0)/2.43e25;
-			mu(i,j) = (-1.0475e26* std::atan(std::log10(x) * 2.59783 - 4.66191) + 1.5733318e26)/gas_dens;
+			//mu(i,j) = (-1.0475e26* std::atan(std::log10(x) * 2.59783 - 4.66191) + 1.5733318e26)/gas_dens;
+			mu(i,j) = 4.289500273955298e+25*std::exp(-1.2096423778714385*std::log(e_ener(i,j)))/gas_dens; 
 			De(i,j) = mu(i,j) * e_ener(i,j) * 2/3;
 
 			mu_energy(i,j) = mu(i,j) * 5/3;
@@ -281,10 +282,14 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
 			//De(i,j) = 0.1;
 		}
 	}
-	//std::cout <<e_ener<< std::endl;
-	std::cout <<mu<<"\n";
 
-	std::cout <<De<<"\n";
+	for (Eigen::MatrixXd a:reaction_matrix){
+		//std::cout <<a<<"\n";
+	}
+	std::cout <<e_ener<< std::endl;
+	//std::cout <<mu<<"\n";
+
+	//std::cout <<De<<"\n";
 	// Calculate Fluxes at each cell
 
 	double vr_max = 1e-308;
@@ -324,9 +329,12 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
 		} else if (s.get_name() == species.back().get_name()) {
 			s.update_mob_coef(mu_energy);
 			s.update_dif_coef(De_energy);
-		} else {
+		} else if (s.get_charge() != 0){ // Only for ions
 			s.update_mob_coef(mu_gas);
-			s.update_dif_coef(De_gas);
+			s.update_dif_coef(De_gas); // In this case the diffusion matrix is zeo
+		} else { // For the other species (in this case should be the 0th matrix)
+			s.update_mob_coef(De_gas); // In this case the diffusion matrix is zeo
+			s.update_dif_coef(De_gas); // In this case the diffusion matrix is zeo
 		}
 
 		Eigen::MatrixXd new_n = Eigen::MatrixXd::Zero(r_size, z_size);
@@ -358,50 +366,62 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
 
 							// For the electrons
 
-							aux_flux = 0.5 * s.get_density()(i,j) * calc_vthermal(s, e_ener(i,j) * 11606. * 2/3); // Base electron wall fluxes
+							aux_flux = -0.5 * s.get_density()(i,j) * calc_vthermal(s, e_ener(i,j) * 11606. * 2/3); // Base electron wall fluxes
+							//std::cout << "e "<< calc_vthermal(s, e_ener(i,j) * 11606. * 2/3)<<"\n";
 
 							for (Specie& ss : species){ // Sum the fluxes of p species
 								if (ss.get_charge() >= 1){
-									aux_flux = aux_flux - 1 * 0.5 * ss.get_density()(i,j) * calc_vthermal(ss, gas_temp);
+									aux_flux = aux_flux + 1 * 0.5 * ss.get_density()(i,j) * calc_vthermal(ss, gas_temp);
 								}
 							}
 
 							aux_flux = aux_flux * S_hori(i,j);
 
-							std::cout<< s.get_name() << j<<std::endl;
+							//std::cout<< s.get_name() << j<<std::endl;
 
 						} else if (s.get_name() == species.back().get_name()) {
 							
 							// For the electron energy density specie
 
-							aux_flux = 2/3 * s.get_density()(i,j) * calc_vthermal(s, e_ener(i,j) * 11606. * 2/3); // Base electron wall fluxes
+							aux_flux = -2/3 * s.get_density()(i,j) * calc_vthermal(s, e_ener(i,j) * 11606. * 2/3); // Base electron wall fluxes
+
+							//std::cout << "e_ene "<< calc_vthermal(s, e_ener(i,j) * 11606. * 2/3)<<"\n";
 
 							for (Specie& ss : species){ // Sum the fluxes of p species
 								if (ss.get_charge() >= 1){
-									aux_flux = aux_flux - 1 * 0.5 * ss.get_density()(i,j) * calc_vthermal(ss, gas_temp) * secondary_emission_energy;
+									aux_flux = aux_flux + 1 * 0.5 * ss.get_density()(i,j) * calc_vthermal(ss, gas_temp) * secondary_emission_energy;
 								}
 							}
 
 							aux_flux = aux_flux * S_hori(i,j);
 
-							std::cout<< s.get_name() << j<< " aaaa"<<std::endl; 
+							//std::cout<< s.get_name() << j<< " aaaa"<<std::endl; 
 
 						// For the other species
 
 						} else if (s.get_name() == "Ar") {
 
-							aux_flux = -0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j); // Probably needs to be the sum of the excited and charged species
+							//aux_flux = -0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j); // Probably needs to be the sum of the excited and charged species
+							
+							for (Specie& ss : species){ // Sum the fluxes of excited/charged species to the wall
+ 								if (ss.get_name() == "Ar_star" || ss.get_name() == "Ar_plus"){
+									aux_flux = aux_flux + 1 * 0.5 * ss.get_density()(i,j) * calc_vthermal(ss, gas_temp);
+								}
+							}
+							//std::cout <<" gases "<<calc_vthermal(s, gas_temp) << "\n";
 
 						} else{
 
-							aux_flux = 0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j);
+							aux_flux = -0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j);
+							//std::cout <<" gases "<<calc_vthermal(s, gas_temp) << "\n";
 						}
 
-						if (j == grid_init){ // Verificar que nao é feito na energia eletronica
+						if (j == grid_init && s.get_name() != species.back().get_name()){ // Verificar que nao é feito na energia eletronica
 							j_l = j_l + aux_flux * s.get_charge() * 1.6e-19; // Can be optimized if the real value of charge is saved in Specie 
 						}
 
-						if (j == grid_end - 1){
+						if (j == grid_end - 1  && s.get_name() != species.back().get_name()){
+
 							j_r = j_r + aux_flux * s.get_charge() * 1.6e-19; // Can be optimized if the real value of charge is saved in Specie 
 						}
 					}
@@ -414,13 +434,14 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
 							temp_sum = temp_sum + c.calc_reaction_rate(e_ener(i,j)) * c.reagents[1].get_density()(i,j) * c.react_energy_delta; 
 						}
 
-						Se(i,j) = - electron_fluxes(i,j) * ez1(i,j) * 1.6e-19 - species[0].get_density()(i,j) * temp_sum;
+						Se(i,j) = - last_flux(i,j) * ez1(i,j) * 1.6e-19 - species[0].get_density()(i,j) * temp_sum;
 					}
 
-					midfluxn(i,j) =  conv.calcFlux_UNO3(i, j, s.get_mob_coef()(i,j), s.get_dif_coef()(i,j), dt, 1, s.get_density(), s.get_charge());
+					midfluxn(i,j) =  conv.calcFlux_UNO3(i, j, s.get_mob_coef()(i,j), s.get_dif_coef()(i,j), dt, 1, s.get_density(), s.get_charge(), grid_init, grid_end);
 					new_n(i, j) = s.get_density()(i, j) + dt * ((midfluxn(i, j) + aux_flux)/vols(i, j) + Se(i,j));
 
 					if (s.get_name() == species[0].get_name()){
+						//std::cout << midfluxn(i, j) << " "<< aux_flux<<"\n";
 						electron_fluxes(i,j) = midfluxn(i, j) + aux_flux; // Save the electron fluxes to calculate the electron energy creation 
 					}
 				}
@@ -512,15 +533,19 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r){
 			}
 		
 		}
-		//std::cout<<new_n<<std::endl;
+
+		//if (s.get_name() == species[0].get_name()){std::cout<<"Density matrix: "<<s.get_density()<<std::endl;}
+		
 		s.update_density(new_n);
 	}
+
+	last_flux = electron_fluxes;
 
 	//ne = new_n;
 	//ni = new_ni;
 
 	t = t+dt; // UPDATE TIME
-	std::cout <<dt<<std::endl;
+	//std::cout <<dt<<std::endl;
 	//solve_Poisson();
 
 	//write_dt(dt_file, dt);

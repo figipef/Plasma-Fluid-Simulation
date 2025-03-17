@@ -10,7 +10,7 @@ class Convection {
 
 		double calcFlux_superbee(int, int, double, double, double, int, Eigen::MatrixXd, int);
 
-		double calcFlux_UNO3(int, int, double, double, double, int, Eigen::MatrixXd, int);
+		double calcFlux_UNO3(int, int, double, double, double, int, Eigen::MatrixXd, int, int, int);
 
 		double calcFlux_UNO2(int, int, double, double, double, int, Eigen::MatrixXd, int);
 

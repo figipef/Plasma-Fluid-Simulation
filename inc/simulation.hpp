@@ -9,6 +9,7 @@
 #include <fstream>
 #include <vector>
 #include <Eigen/Dense>
+#include <deque>
 
 class Simulation{
 
@@ -26,7 +27,7 @@ class Simulation{
 
 		void update_charge_density();
 
-		void push_time(int, double&, double&);
+		void push_time(int, double&, double&, Eigen::MatrixXd&);
 
 		void write_dens(std::ofstream&);
 

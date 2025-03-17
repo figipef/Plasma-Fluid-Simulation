@@ -6,89 +6,8 @@ from matplotlib.colors import SymLogNorm
 from scipy.optimize import curve_fit
 import re
 
-# Initialize lists to store the columns
-column1 = []
-column2 = []
-
-print(1.380649e-23 * 300 / (1.9e-19))
-
-# Open and read the txt file
-with open("bolsig/N2mob.txt", "r") as file:
-    for line in file:
-        # Split each line into two parts
-        values = line.split()
-        # Convert the values to floats and store them in the respective lists
-        column1.append(float(values[0]))
-        column2.append(float(values[1]))
-
-x = np.logspace(-3, 4,100)
-
-coeffs = [ 4.19038e+024,
--2.50599e+024,
- 3.44633e+023]
-
-# Initialize lists to store the columns
-column1 = []
-column2 = []
-
-# Open and read the txt file
-with open("bolsig/N2temp.txt", "r") as file:
-    for line in file:
-        # Split each line into two parts
-        values = line.split()
-        # Convert the values to floats and store them in the respective lists
-        column1.append(float(values[0]))
-        column2.append(float(values[1]))
-
-#print(column1[0])
-x = np.logspace(-4, 4,1000)
-
-def dif(x):
-
-    if x < 1:
-        return 1e24
-    else:
-        return 1e24 * (np.exp(0.02*np.log( (x*100))**2) - 0.5)
-
-def difusion(x,a1,a2,b2,c2,d2,a3,b3,c3,d3,e3,a4,b4,c4):
-    return np.piecewise(x,
-        [x <= 0.1, (x >0.1) & (x <= 10*np.sqrt(10)), (x > 10 *np.sqrt(10)) & (x <=100), x > 100],
-        [
-            lambda x: a1,
-            lambda x: a2*np.arctan(b2*np.log10(x) - c2) + d2,
-            lambda x: a3*(np.log10(x) -b3)**2 + c3 * (np.log10(x)-d3) + e3,
-            lambda x: a4* np.exp(b4 * np.log10(x)) + c4
-        ])
-
-p0=[9.798e23, 2.9e23, 2.818,2.265e-1,1.397e24,3.770921e24,1.66159,-100,1,1.7099e24,4.918e24,3.711e-1,-8.059e24]  # Initial guesses for a, b, and c
-
-popt, pcov = curve_fit(
-    difusion, 
-    column1, 
-    column2, 
-    p0=p0  # Initial guesses for a, b, and c
-)
-
-a1,a2,b2,c2,d2,a3,b3,c3,d3,e3,a4,b4,c4 = p0
-
-print(a1,a2,b2,c2,d2,a3,b3,c3,d3,e3,a4,b4,c4)
-
-plt.plot(x, difusion(x,a1,a2,b2,c2,d2,a3,b3,c3,d3,e3,a4,b4,c4), 
-         color='red')
-plt.scatter(column1, column2)
-plt.plot()
-plt.xscale("log")
-plt.yscale("log")
-plt.xlim(1e-4, 10e3)
-
-plt.show()
-
-# Initialize lists to store the columns
-column1 = []
-column2 = []
-
 # File path
-file_path = "./chemistry/Bolsig Ar Data.TXT"
+file_path = "./chemistry/swarm.TXT"
 
 with open(file_path, "r") as file:
     lines = file.readlines()
@@ -109,7 +28,7 @@ for line in lines:
     elif rate_section and re.match(r"^\s*\d+", line):  # Matches data rows
         parts = line.split()
         if len(parts) >= 5:
-            E_N_list.append(float(parts[1]))  # Convert to float
+            E_N_list.append(float(parts[2]))  # Convert to float
             C2_list.append(float(parts[4]))
             C3_list.append(float(parts[5]))
     elif rate_section and line.strip() == "":  # Stop at the next blank line
@@ -131,16 +50,19 @@ for line in lines:
 
 
 # Print lists
-print("E/N List:", E_N_list[2:])
+print("E/N List:", E_N_list) # Now its electron energy
 print("C2 List:", C2_list)
 print("C3 List:", C3_list)
 
-print("E/N List:", E_N_list[2:])
+print("E/N List:", E_N_list)
 print("Mobility List:", Mobility_list)
 print("Difusion List:", Difusion_list)
 
 def arctan(x,a,b,c,d): # For the mobility
     return a * np.arctan(np.log10(x) * b - c) + d
+
+def line(x,a,b):
+    return a*np.exp(b*np.log(x))
 
 def b(x,a,b,c,d): # For the Ionization Rates
 
@@ -148,13 +70,13 @@ def b(x,a,b,c,d): # For the Ionization Rates
     #return 1.4e-13  * (np.exp(-0.5*( np.log(x*0.00008) / 1.2)**2)) #C3
     #return a  * (np.exp(-0.5*( np.log(x*b) / c)**2)) # General
 
-    #return a  * (np.exp(b*( np.log(x))**2)) + c # General
-    return a  * (np.exp(-0.5*( (np.log(x*b)+ d) / c)**2)) # General
+    #return a  * (np.exp(b*( np.log(x)/c)**2)) # General
+    return a  * (np.exp(-0.5*( (np.log(x*b)) / c)**2)) # General
 
 def cubic(x,a,b,c,d,e):
 
     return a*np.exp(b*np.log(x)**3 + c*np.log(x)**2+d*np.log(x)) + e
-
+    
 # Fit the data with free parameters
 poptC2, pcov = curve_fit(
     b, 
@@ -183,7 +105,7 @@ plt.plot(x, b(x, a_fitC2, b_fitC2, c_fitC2,d))
 plt.scatter(E_N_list, C2_list)
 plt.plot()
 plt.xscale("log")
-#plt.yscale("log")
+plt.yscale("log")
 
 plt.show()
 #print(b(x, a_fitC3, b_fitC3, c_fitC3,d3))
@@ -191,27 +113,31 @@ plt.plot(x, b(x, a_fitC3, b_fitC3, c_fitC3,d3))
 plt.scatter(E_N_list, C3_list)
 plt.plot()
 plt.xscale("log")
-#plt.yscale("log")
+plt.yscale("log")
 
 plt.show()
 
 # Fit the data with free parameters
 popt, pcov = curve_fit(
-    arctan, 
-    E_N_list[2:], 
-    Mobility_list[2:], 
-    p0=[-1e25, 1, -5,1e25]  # Initial guesses for a, b, and c
+    line, 
+    E_N_list[7:17], 
+    Mobility_list[7:17], 
+    p0=[-1e25, 0]
 )
+#arctan,
+#p0=[-1e25, 1, -5,1e25]  # Initial guesses for a, b, and c
 
 # Extract fitted parameters
-a_fit, b_fit, c_fit, d_fit = popt
-print(a_fit, b_fit, c_fit, d_fit)
+#a_fit, b_fit, c_fit, d_fit = popt
+a_fit, b_fit = popt
+#print(a_fit, b_fit, c_fit, d_fit)
+print(a_fit, b_fit)
 
 #print(f)
-plt.plot(x, arctan(x, a_fit, b_fit, c_fit, d_fit), 
-         label=f'Fitted arctan: a={a_fit:.2e}, b={b_fit:.2e}, c={c_fit:.2e}', 
+plt.plot(x,line(x, a_fit,b_fit), #arctan(x, a_fit, b_fit, c_fit, d_fit), 
+         label=f'Fitted arctan: a={a_fit:.2e}, b={b_fit:.2e}', 
          color='red')
-plt.scatter(E_N_list, Mobility_list)
+plt.scatter(E_N_list[7:17], Mobility_list[7:17])
 plt.plot()
 plt.xscale("log")
 plt.yscale("log")
@@ -229,7 +155,7 @@ poptcubic, pcov = curve_fit(
 a_fit, b_fit, c_fit, d_fit, e_fit = poptcubic
 print("Cubic: ",poptcubic)
 plt.plot(x, cubic(x,a_fit, b_fit, c_fit, d_fit, e_fit))
-plt.scatter(E_N_list, Difusion_list)
+plt.scatter(E_N_list[7:17], Difusion_list[7:17])
 plt.plot()
 plt.xscale("log")
 plt.yscale("log")

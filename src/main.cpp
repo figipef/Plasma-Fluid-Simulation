@@ -121,39 +121,39 @@ int main() {
     int react_Ar_star[] = {1,-1,0,-2,-1};
     int react_Ar_plus[] = {0,0,1,1,0};
 
-    Specie electron("e", -1, 511, react_e, ne);
-    Specie argon("Ar", 0, 511, react_Ar, gas_dens);
-    Specie argon_star("Ar_star", 0, 511, react_Ar_star, null);
-    Specie argon_plus("Ar_plus", 1, 511, react_Ar_plus, null);
+    Specie electron("e", -1, 9.1093837e-31, react_e, ne);
+    Specie argon("Ar", 0, 6.6335209e-26, react_Ar, gas_dens);
+    Specie argon_star("Ar_star", 0, 6.6335209e-26, react_Ar_star, null);
+    Specie argon_plus("Ar_plus", 1, 6.6335209e-26, react_Ar_plus, null);
 
     Specie r1_reag[2] = {electron, argon};
     Specie r1_prod[2] = {electron, argon_star};
 
-    Chemistry r1 = Chemistry(2,2, r1_reag, r1_prod, 0, 11.5, 4.1e-14, 0.00015, 1.3);
+    Chemistry r1 = Chemistry(2,2, r1_reag, r1_prod, 0, 11.5, 3.55613441e-14, 1.70881680e-02, 9.42791699e-01); // Excitation
 
     Specie r2_reag[2] = {electron, argon_star};
     Specie r2_prod[2] = {electron, argon};
 
-    Chemistry r2 = Chemistry(2,2, r1_reag, r1_prod, 0, -11.5, 4.1e-14, 0.00015, 1.3);
+    Chemistry r2 = Chemistry(2,2, r2_reag, r2_prod, 0, -11.5, 3.55613404e-14, 1.70881680e-02, 9.42791699e-01); // Superelastic
 
     Specie r3_reag[2] = {electron, argon};
     Specie r3_prod[2] = {electron, argon_plus};
 
-    Chemistry r3 = Chemistry(2,2, r3_reag, r3_prod, 0, 15.8, 1.4e-13, 0.00008, 1.2);
+    Chemistry r3 = Chemistry(2,2, r3_reag, r3_prod, 0, 15.8, 1.03817139e-13, 1.04243404e-02, 9.48850558e-01); // Ionization
 
     double constant_rate_r5 = 3.4e8 /6.022e-23;
 
     Specie r5_reag[2] = {argon_star, argon_star};
     Specie r5_prod[3] = {electron, argon, argon_plus};
 
-    Chemistry r5 = Chemistry(2,2, r1_reag, r1_prod, 1, 0, constant_rate_r5, 0, 0);
+    Chemistry r5 = Chemistry(2,2, r5_reag, r5_prod, 1, 0, constant_rate_r5, 0, 0);
 
     double constant_rate_r6 = 1807 /6.022e-23;
 
     Specie r6_reag[2] = {argon_star, argon};
     Specie r6_prod[2] = {argon, argon};
 
-    Chemistry r6 = Chemistry(2,2, r3_reag, r3_prod, 1, 0, constant_rate_r6, 0, 0);
+    Chemistry r6 = Chemistry(2,2, r6_reag, r6_prod, 1, 0, constant_rate_r6, 0, 0);
 
     //Specie ion("i", 1, 511, react_e, ni);
 
@@ -178,6 +178,8 @@ int main() {
     
     int a = 0;
 
+    Eigen::MatrixXd electron_fluxes = Eigen::MatrixXd::Zero(size_r, grid_size); // To be used by electron energy after an iteration
+
     while (simul.get_t() <= 5e-8) {
 
         PoissonSolver2D solver(left_potential*sin(frequency * simul.get_t()),right_potential,0,0,fronteira_livre,sig,simul);
@@ -185,126 +187,32 @@ int main() {
         double j_left = 0;
         double j_right = 0;
         solver.solve();
-        std::cout << simul.get_Ez1()<<std::endl;
+        //std::cout << simul.get_Ez1()<<std::endl;
         simul.write_dens(file);
 
         //std::cout <<a<<std::endl;
         a++;
         double old_t = simul.get_t();
+        simul.push_time(0, j_left, j_right, electron_fluxes);
         if (a%100 == 0){
             std::cout<< "time "<<simul.get_t()<<std::endl;
+            double dt = simul.get_t() - old_t; // Get the time step for the sigma calculation
+            std::cout<< "dt "<<dt<<std::endl;
         }
-        simul.push_time(0, j_left, j_right);
+        
 
         double dt = simul.get_t() - old_t; // Get the time step for the sigma calculation
 
         sig(grid_init - 1) = sig(grid_init - 1) + dt * j_left; // Check com o professor se faz sentido
         sig(grid_end - 1) = sig(grid_end - 1) + dt * j_right;
+
+        //for (Specie& s : species){
+        //    std::cout <<"especies "<<s.get_density()<<"\n";
+        //}
+
     }
     std::cout<< "iter "<<a<<std::endl;
     simul.write_dens(file);
     
-    
-    //Poisson2DCyl testPoisson2D(size_r,size_z,20.0e-6,20.0e-6,eps, sig);
-    //std::ofstream file2("rho_data2.txt");
-    //testPoisson2D.solve(10e3,0,0,0, ne,ni, fronteira_livre);
-    //testPoisson2D.solve_Poisson();
-    //std::cout <<" RIGHT" <<std::endl;
-    //std::cout << testPoisson2D.Ez1<<std::endl;
-    //testPoisson2D.write_dens(file2);
-
-    /*
-    // ====================
-    //
-    //  Polynomial Fitting
-    //
-    // ====================
-    
-    std::ifstream mobfile("../bolsig/N2mob.txt"); // Replace "data.txt" with your file name
-    if (!mobfile.is_open()) {
-        std::cerr << "Error: Unable to open the file!" << std::endl;
-        return 1;
-    }
-
-    // Read data from the file
-    std::vector<double> x, y;
-    double xi, yi;
-    while (mobfile >> xi >> yi) {
-        x.push_back(xi);
-        y.push_back(yi);
-    }
-    mobfile.close();
-
-    // Perform polynomial fitting
-    
-
-    std::ifstream tempfile("../bolsig/N2temp.txt"); // Replace "data.txt" with your file name
-    if (!tempfile.is_open()) {
-        std::cerr << "Error: Unable to open the file!" << std::endl;
-        return 1;
-    }
-
-    // Read data from the file
-    std::vector<double> x2, y2;
-    double xi2, yi2;
-    while (tempfile >> xi2 >> yi2) {
-        x2.push_back(xi2);
-        y2.push_back(yi2);
-    }
-    tempfile.close();
-    //std::cout<<y2[0]<<std::endl;
-    int degree = 2; // Adjust the degree of the polynomial as needed
-    Eigen::VectorXd mob_coeffs = polynomialFit(x, y, degree,1);
-    Eigen::VectorXd temp_coeffs = polynomialFit(x2, y2, degree,0);
-
-    std::cout<<mob_coeffs<<std::endl;
-    std::cout<<temp_coeffs<<std::endl;
-
-
-    // =======================
-    //
-    //
-    // =======================
-
-    Poisson2DCyl testPoisson2D(size_r,size_z,20.0e-6,20.0e-6,eps, sig);
-
-    testPoisson2D.set_pol_coeffs(mob_coeffs, temp_coeffs, degree);
-
-    //testPoisson2D.solve(0,0,0,0, &ZERO2D, fronteira_livre, "zero"); 
-    std::ofstream file("rho_data.txt");
-    std::ofstream dt_file("dt_data.txt");
-    
-    testPoisson2D.solve(40e3,0,0,0, ne,ni, fronteira_livre);
-
-    testPoisson2D.solve_Poisson();
-
-    testPoisson2D.write_fields("i");
-    testPoisson2D.write_dens(file); 
-    //testPoisson2D.solve_Poisson();    
-
-    std::cout<<"test"<<std::endl;
-    
-    
-    if (!file.is_open()) {
-        std::cerr << "Error opening file!\n";
-        return 1;
-    }
-    int i = 0;
-    //while (testPoisson2D.t <= 0) {     //
-    auto start = std::chrono::high_resolution_clock::now();
-    while (testPoisson2D.t <= 5e-9) {
-        testPoisson2D.push_time(i ,8e-14,dt_file, 0);
-        i++;
-
-    }
-    auto t1 = std::chrono::high_resolution_clock::now();
-
-    std::chrono::duration<double, std::milli> d1 = t1 - start;
-    
-    std::cout << "Time to Run Code: " << d1.count() << " ms" << std::endl;
-
-    testPoisson2D.write_fields("f");
-    testPoisson2D.write_dens(file);
-    */
     return 0;
 }

@@ -1,0 +1,22 @@
+INPUT VALUES
+GAS_TEMP=                       400   K
+GAS_PRESSURE=                   760   TORR
+ELECTRON_DENSITY=               1E6   M-3
+ELECTRON_MEAN_ENERGY=           5     EV
+SECONDARY_ELECTRON_MEAN_ENERGY= 2.5   EV
+GRID_SIZE=                      268
+GRID_INIT=                      34
+GRID_END=                       234
+PERMITIVITY=                    5
+LENGTH=                         10E-4 M
+LEFT_POTENTIAL=                 1E3   V
+RIGHT_POTENTIAL=                0     V
+POTENTIAL_TYPE=                 OSC
+FREQ=                           10    S^-1
+NUMBER_SPECIES=                 4
+NUMBER_REACTIONS=               7
+REACT_TABLE=
+ 0  0  0  1  1  1  0
+ 0 -1  1 -1  0  1  1
+ 0  1 -1  0 -1 -2 -1
+ 0  0  0  1  1  1  0
