@@ -6,6 +6,9 @@ from matplotlib.colors import SymLogNorm
 from scipy.optimize import curve_fit
 import re
 
+import scipy.constants as const
+from scipy.integrate import simps
+
 # File path
 file_path = "./chemistry/swarm.TXT"
 
@@ -14,9 +17,11 @@ with open(file_path, "r") as file:
 # Locate the "Rate coefficients" section
 rate_section = False
 transport_section = False
+inv_rate_coef = False
 E_N_list = []
 C2_list = []
 C3_list = []
+inv_C2 = []
 
 Mobility_list = []
 Difusion_list = []
@@ -48,11 +53,25 @@ for line in lines:
     elif transport_section and line.strip() == "":  # Stop at the next blank line
         break
 
+for line in lines:
+    if "Inverse rate coefficients" in line:
+        inv_rate_coef = True
+
+    elif inv_rate_coef and re.match(r"^\s*\d+", line):  # Matches data rows
+        parts = line.split()
+        if len(parts) >= 6:
+            #E_N_list.append(float(parts[1]))  # Convert to float
+            inv_C2.append(float(parts[4]))
+    elif inv_rate_coef and line.strip() == "":  # Stop at the next blank line
+        break
+
+
 
 # Print lists
 print("E/N List:", E_N_list) # Now its electron energy
 print("C2 List:", C2_list)
 print("C3 List:", C3_list)
+print("InvC2 List: ", inv_C2)
 
 print("E/N List:", E_N_list)
 print("Mobility List:", Mobility_list)
@@ -93,19 +112,36 @@ poptC3, pcov = curve_fit(
     p0=[1.4e-13, 0.00008, 1.6,0]  # Initial guesses for a, b, and c
 )
 
+poptinvC2, pcov = curve_fit(
+    b, 
+    E_N_list, 
+    inv_C2, 
+    p0=[1.4e-13, 0.00008, 1.6,0]  # Initial guesses for a, b, and c
+)
+
 # Extract fitted parameters
 a_fitC2, b_fitC2, c_fitC2,d = poptC2
 a_fitC3, b_fitC3, c_fitC3,d3 = poptC3
+a_invC2, b_invC2, c_invC2,d_invC2 = poptinvC2
 
 print("C2 optimal values: ", poptC2)
 print("C3 optimal values: ", poptC3)
+print("Inverse C2 optimal values: ", poptinvC2)
 x = np.logspace(-3, 4,100)
+
+plt.plot(x, b(x, a_invC2, b_invC2, c_invC2,d_invC2))
+plt.scatter(E_N_list, inv_C2)
+plt.plot()
+plt.xscale("log")
+#plt.yscale("log")
+
+plt.show()
 
 plt.plot(x, b(x, a_fitC2, b_fitC2, c_fitC2,d))
 plt.scatter(E_N_list, C2_list)
 plt.plot()
 plt.xscale("log")
-plt.yscale("log")
+#plt.yscale("log")
 
 plt.show()
 #print(b(x, a_fitC3, b_fitC3, c_fitC3,d3))
@@ -113,7 +149,7 @@ plt.plot(x, b(x, a_fitC3, b_fitC3, c_fitC3,d3))
 plt.scatter(E_N_list, C3_list)
 plt.plot()
 plt.xscale("log")
-plt.yscale("log")
+#plt.yscale("log")
 
 plt.show()
 
@@ -159,6 +195,90 @@ plt.scatter(E_N_list[7:17], Difusion_list[7:17])
 plt.plot()
 plt.xscale("log")
 plt.yscale("log")
+plt.show()
+
+# File path
+file_path2 = "./chemistry/Cross section.txt"
+
+with open(file_path2, "r") as file2:
+    lines2 = file2.readlines()
+# Locate the "Rate coefficients" section
+ionization = False
+
+electron_energy = []
+cross_section = []
+
+for line in lines2:
+    print(line)
+    if "IONIZATION" in line:
+        ionization = True
+
+    elif rate_section and re.match(r"^\s*\d+", line):  # Matches data rows
+        parts = line.split()
+        if len(parts) >= 2:
+            electron_energy.append(float(parts[0]) - 11.5)  # Convert to float
+            cross_section.append(float(parts[1]))
+    elif rate_section and line.strip() == "":  # Stop at the next blank line
+        break
+
+print(electron_energy)
+print(cross_section)
+
+# Constants
+m_e = const.electron_mass  # Electron mass (kg)
+eV_to_J = const.e  # Conversion from eV to Joules
+
+print(eV_to_J)
+
+# Function to compute electron velocity (m/s) from energy (eV)
+def electron_velocity(E):
+    E = np.array(E, dtype=float)  # Ensure E is a NumPy array
+    return np.sqrt(2 * E * eV_to_J / m_e)
+
+# Function to compute Maxwellian EEDF (normalized)
+def maxwellian_eedf(E, Te):
+    E = np.array(E, dtype=float)  # Ensure E is a NumPy array
+    kB_Te = Te*2/3  # Temperature in eV (since kB * Te in eV units)
+    norm_factor = 2 / (np.sqrt(np.pi) * (kB_Te)**(3/2))
+    return norm_factor * np.sqrt(E) * np.exp(-E / (kB_Te))
+
+# Compute ionization rate for a given electron temperature
+def ionization_rate(Te):
+    v = electron_velocity(electron_energy)  # Compute electron velocities (array)
+    f = maxwellian_eedf(electron_energy, Te)  # Compute Maxwellian EEDF (array)
+    integrand = cross_section * v * f  # Compute element-wise product
+
+    # Numerical integration using Simpson's rule
+    R = simps(integrand, electron_energy)
+    return R  # Ionization rate (m^3/s)
+
+C5 = []
+a = 0
+
+for i in E_N_list:
+    C5.append(ionization_rate(i))
+
+    print("Calc here for energy: ", C5[a], "Bolsig online - ", C3_list[a])
+    a+=1;
+
+print(C5)
+
+poptC5, pcov = curve_fit(
+    b, 
+    E_N_list, 
+    C5, 
+    p0=[1.4e-13, 0.00008, 1.6,0]  # Initial guesses for a, b, and c
+)
+
+a_C5, b_C5, c_C5,d_C5 = poptC5
+print("Step Ionization optimal values: ", poptC5)
+
+plt.plot(x, b(x, a_C5, b_C5, c_C5,d_C5))
+plt.scatter(E_N_list, C5)
+plt.plot()
+plt.xscale("log")
+#plt.yscale("log")
+
 plt.show()
 
 #plt.plot(x,lst1D[int(i*50):int(i*350)], color= "blue", label="current test")

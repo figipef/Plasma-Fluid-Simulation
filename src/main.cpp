@@ -116,10 +116,10 @@ int main() {
     //int react_Ar_star[] = {0,1,-1,0,-1,-2,-1};
     //int react_Ar_plus[] = {0,0,0,1,1,1,0};
 
-    int react_e[] = {0,0,1,1,0}; // Reactions being considered rn are 2,3,4,6,7
-    int react_Ar[] = {-1,1,-1,1,1};
-    int react_Ar_star[] = {1,-1,0,-2,-1};
-    int react_Ar_plus[] = {0,0,1,1,0};
+    int react_e[] =       {0,0,1,1,1,0}; // Reactions being considered rn are 2,3,4,5,6,7
+    int react_Ar[] =      {-1,1,-1,0,1,1};
+    int react_Ar_star[] = {1,-1,0,-1,-2,-1};
+    int react_Ar_plus[] = {0,0,1,1,1,0};
 
     Specie electron("e", -1, 9.1093837e-31, react_e, ne);
     Specie argon("Ar", 0, 6.6335209e-26, react_Ar, gas_dens);
@@ -134,12 +134,17 @@ int main() {
     Specie r2_reag[2] = {electron, argon_star};
     Specie r2_prod[2] = {electron, argon};
 
-    Chemistry r2 = Chemistry(2,2, r2_reag, r2_prod, 0, -11.5, 3.55613404e-14, 1.70881680e-02, 9.42791699e-01); // Superelastic
+    Chemistry r2 = Chemistry(2,2, r2_reag, r2_prod, 0, -11.5, 5.00178366e-14, 2.31631264e-02, 1.63097482e+00); // Superelastic
 
     Specie r3_reag[2] = {electron, argon};
     Specie r3_prod[2] = {electron, argon_plus};
 
     Chemistry r3 = Chemistry(2,2, r3_reag, r3_prod, 0, 15.8, 1.03817139e-13, 1.04243404e-02, 9.48850558e-01); // Ionization
+
+    Specie r4_reag[2] = {electron, argon_star};
+    Specie r4_prod[2] = {electron, argon_plus};
+
+    Chemistry r4 = Chemistry(2,2, r4_reag, r4_prod, 0, 4.3, 1.16698343e-13, 9.08521436e-03, 1.21470021e+00); // StepWize
 
     double constant_rate_r5 = 3.4e8 /6.022e-23;
 
@@ -168,6 +173,7 @@ int main() {
     chemistries.push_back(r1);
     chemistries.push_back(r2);
     chemistries.push_back(r3);
+    chemistries.push_back(r4);
     chemistries.push_back(r5);
     chemistries.push_back(r6);
 
