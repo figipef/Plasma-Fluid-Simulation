@@ -1,12 +1,15 @@
 //#include "placeholder.hpp"
 //#include "poisson1DCart.hpp"
 //#include "poisson2DCyl.hpp"
+#define _USE_MATH_DEFINES
+
 #include "specie.hpp"
 #include "chemistry.hpp"
 #include "simulation.hpp"
 #include "poissonsolver2d.hpp"
 #include "convection.hpp"
 
+#include <memory>
 #include <cmath>
 #include <vector>
 #include <Eigen/Dense>
@@ -180,24 +183,41 @@ int main() {
 
     Eigen::MatrixXd electron_fluxes = Eigen::MatrixXd::Zero(size_r, grid_size); // To be used by electron energy after an iteration
 
-    while (simul.get_t() <= 5e-8) {
+    std::unique_ptr<PoissonSolver2D> solver = std::make_unique<PoissonSolver2D>(
+        left_potential * sin(2 * M_PI * frequency * 0.0),
+        right_potential, 0, 0, fronteira_livre, sig, simul
+    );
 
-        PoissonSolver2D solver(left_potential*sin(frequency * simul.get_t()),right_potential,0,0,fronteira_livre,sig,simul);
+    while (simul.get_t() <= 5e-5) {
+
+        if (a%1000 == 0){
+
+            solver = std::make_unique<PoissonSolver2D>(
+                left_potential * sin(2 * M_PI * frequency * simul.get_t()),
+                right_potential, 0, 0, fronteira_livre, sig, simul
+            );
+
+        }
+
+        //PoissonSolver2D solver(left_potential*sin(2*3.1416*frequency * simul.get_t()),right_potential,0,0,fronteira_livre,sig,simul);
+        
         //std::cout <<left_potential*sin(frequency * simul.get_t())<<std::endl;
         double j_left = 0;
         double j_right = 0;
-        solver.solve();
+        solver->solve();
         //std::cout << simul.get_Ez1()<<std::endl;
-        simul.write_dens(file);
+
 
         //std::cout <<a<<std::endl;
         a++;
         double old_t = simul.get_t();
         simul.push_time(0, j_left, j_right, electron_fluxes);
-        if (a%100 == 0){
+        if (a%10000 == 0){
+            std::cout << "voltage :" <<left_potential*sin(2*3.1416*frequency * simul.get_t())<<"\n";
             std::cout<< "time "<<simul.get_t()<<std::endl;
             double dt = simul.get_t() - old_t; // Get the time step for the sigma calculation
             std::cout<< "dt "<<dt<<std::endl;
+            simul.write_dens(file);
         }
         
 
