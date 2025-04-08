@@ -160,20 +160,32 @@ popt, pcov = curve_fit(
     Mobility_list[7:17], 
     p0=[-1e25, 0]
 )
+
+poptlin1, pcovlin1 = curve_fit(
+    line, 
+    E_N_list[2:6], 
+    Mobility_list[2:6], 
+    p0=[-1e25, 0]
+)
 #arctan,
 #p0=[-1e25, 1, -5,1e25]  # Initial guesses for a, b, and c
 
 # Extract fitted parameters
 #a_fit, b_fit, c_fit, d_fit = popt
 a_fit, b_fit = popt
+a2_fit, b2_fit = poptlin1
 #print(a_fit, b_fit, c_fit, d_fit)
-print(a_fit, b_fit)
+print("First line", a2_fit, b2_fit)
+print("Second line",a_fit, b_fit)
+
 
 #print(f)
 plt.plot(x,line(x, a_fit,b_fit), #arctan(x, a_fit, b_fit, c_fit, d_fit), 
          label=f'Fitted arctan: a={a_fit:.2e}, b={b_fit:.2e}', 
          color='red')
-plt.scatter(E_N_list[7:17], Mobility_list[7:17])
+plt.plot(x,line(x, a2_fit,b2_fit), #arctan(x, a_fit, b_fit, c_fit, d_fit),  
+         color='red')
+plt.scatter(E_N_list[0:17], Mobility_list[0:17])
 plt.plot()
 plt.xscale("log")
 plt.yscale("log")

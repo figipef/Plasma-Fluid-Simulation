@@ -206,15 +206,6 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r, Eigen::Matrix
 
 	std::vector<Eigen::MatrixXd> reaction_matrix; // Reaction matrix list
 
-	//std::vector<DataPoint> dif_data = { // Difusion data
-    //    {0.001678, 1.092e+25}, {0.002221, 2.196e+25}, {0.003451, 3.298e+25}, 
-    //    {0.007177, 3.861e+25}, {0.01671, 3.777e+25}, {0.03987, 3.272e+25}, 
-    //    {0.09591, 2.646e+25}, {0.2593, 2.074e+25}, {1.902, 1.607e+25}, 
-    //    {14.64, 1.23e+25}, {74.43, 8.949e+24}, {260.3, 6.922e+24}, 
-    //    {647.5, 6.551e+24}, {1240.0, 7.629e+24}, {2032.0, 9.983e+24}, 
-    //    {3075.0, 1.362e+25}, {4442.0, 1.893e+25}, {6182.0, 2.686e+25}
-    //};
-
 	// Fill the reactions matrices
 	for (Chemistry& c : chemistries){ 
 		Eigen::MatrixXd mat = Eigen::MatrixXd::Zero(r_size, z_size);
@@ -234,59 +225,27 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r, Eigen::Matrix
 				counter++;
 			}
 
-			double x;
-			
-			if (j == grid_init){
-				x = std::abs(ez2(i,j) / (gas_dens) * 1e21);
-			}else if (j == grid_end - 1){
-				x = std::abs(ez1(i,j-1) / (gas_dens) * 1e21);
-			}else{
-				x = std::abs((ez1(i,j) + ez1(i,j-1))/2 / (gas_dens) * 1e21);
+			if (e_ener(i,j) <= 0.025){
+				mu(i,j) = 6.4e25/gas_dens;
+			} else if (e_ener(i,j) > 0.025 && e_ener(i,j) <= 0.14){
+				mu(i,j) = 2.831166363547715e+27*std::exp(0.9628859587344575*std::log(e_ener(i,j)))/gas_dens; 
+			} else {
+				mu(i,j) = 4.289500273955298e+25*std::exp(-1.2096423778714385*std::log(e_ener(i,j)))/gas_dens; 
 			}
-			//std::cout <<x<<"\n";
-			/* DIFFUSION COEFFECIENT CALCULATION THROUGH LIN INTERPOLATION
-			double dif_coef = 0;
 
-			// Find the two data points surrounding x
-    		for (size_t i = 0; i < dif_data.size() - 1; ++i) {
-    		    if (x >= dif_data[i].x && x <= dif_data[i + 1].x) {
-    		        // Interpolate between data[i] and data[i + 1]
-    		        double x0 = dif_data[i].x;
-    		        double y0 = dif_data[i].y;
-    		        double x1 = dif_data[i + 1].x;
-    		        double y1 = dif_data[i + 1].y;
-            
-    		        // Perform the linear interpolation
-    		        dif_coef = y0 + (x - x0) * (y1 - y0) / (x1 - x0);
-    		    } else if (x <= dif_data[0].x){
-    		    	dif_coef = 0;
-    		    } else if (x >= dif_data[dif_data.size() - 1].x){
-    		    	dif_coef = 0;
-    		    }
-    		}
-			*/ 
-			//mu(i,j) = Pol(x, 0)/2.43e25;
-			//mu(i,j) = (-1.0475e26* std::atan(std::log10(x) * 2.59783 - 4.66191) + 1.5733318e26)/gas_dens;
-			mu(i,j) = 4.289500273955298e+25*std::exp(-1.2096423778714385*std::log(e_ener(i,j)))/gas_dens; 
 			De(i,j) = mu(i,j) * e_ener(i,j) * 2/3;
 
 			mu_energy(i,j) = mu(i,j) * 5/3;
 			De_energy(i,j) = mu_energy(i,j) * e_ener(i,j) * 2/3;
 
 			mu_gas(i,j) = 0.12/gas_pres;
-			//De(i,j) = dif_coef/gas_dens; 
-
-			//Se(i,j) = Pol(x, 2) * 2.43e25 * ne(i,j); 
-			
-			//mu(i,j) = 0.03;
-			//De(i,j) = 0.1;
 		}
 	}
 
 	for (Eigen::MatrixXd a:reaction_matrix){
 		//std::cout <<a<<"\n";
 	}
-	std::cout <<e_ener<< std::endl;
+	//std::cout <<e_ener<< std::endl;
 	//std::cout <<mu<<"\n";
 
 	//std::cout <<De<<"\n";
@@ -301,8 +260,8 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r, Eigen::Matrix
 
 	//dt = std::min({0.125 * z_step/vz_max, 0.25* z_step*z_step/De, 0.5 * 8.85e-12/(mu * ne.maxCoeff()* 1.6e-19)});
 	
-	double A_cvt = 0.1;
-	double A_dif = 0.1;
+	double A_cvt = 0.2;
+	double A_dif = 0.2;
 
 	if (r_size == 1){
 	
