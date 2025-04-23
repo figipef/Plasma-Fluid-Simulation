@@ -6,7 +6,7 @@ class Convection {
 
 	public:
 		Convection();
-		Convection(double, double, Eigen::MatrixXd, Eigen::MatrixXd&);
+		Convection(double, double, Eigen::MatrixXd, Eigen::MatrixXd&, Eigen::MatrixXd&);
 
 		double calcFlux_superbee(int, int, double, double, double, int, Eigen::MatrixXd, int);
 
@@ -32,6 +32,7 @@ class Convection {
 		double z_size;
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> S_hori;
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Ez1;
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Ez2;
 
 };
 

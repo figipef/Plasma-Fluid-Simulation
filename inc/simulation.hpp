@@ -29,7 +29,11 @@ class Simulation{
 
 		void push_time(int, double&, double&, Eigen::MatrixXd&);
 
-		void write_dens(std::ofstream&);
+		void write_dens(std::ofstream&, int);
+
+		void write_efield(std::ofstream&);
+
+		void write_e_energy(std::ofstream&);
 
 		void set_grid1D(int, double);
 		
@@ -74,6 +78,15 @@ class Simulation{
 
 		double calc_vthermal(Specie, double);
 
+		void calc_e_energy(Eigen::MatrixXd&);
+
+		void calc_reaction_vector(std::vector<Eigen::MatrixXd>&, Eigen::MatrixXd);
+
+		void calc_update_species_coeffs(Eigen::MatrixXd);
+
+		void calc_time_step(double&, double, double);
+
+		double calc_net_reaction_source(const Specie&, int, int, const std::vector<Eigen::MatrixXd>);
 	private:
 
 		// Time
@@ -142,6 +155,8 @@ class Simulation{
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> ez1; // Horizontal Eletric Field on the left
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> ez2; // Horizontal Eletric Field on the right
 
+		// Electron energies matrix
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> e_ener;
 };
 
 // Structure to store data points (x, y)

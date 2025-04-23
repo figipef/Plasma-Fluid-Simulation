@@ -1,7 +1,7 @@
 #include "poissonsolver2d.hpp"
 #include "simulation.hpp"
 
-PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VIN ,double fronteira[4], Eigen::VectorXd& _sig, Simulation& _simul) : simul(_simul){
+PoissonSolver2D::PoissonSolver2D(double fronteira[4], Eigen::VectorXd& _sig, Simulation& _simul) : simul(_simul){
 
 	// Set up all variables necessary from simul
 
@@ -46,11 +46,11 @@ PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VI
 					if (r_size > 1){
 						phic[i][j] = phic[i][j] + phis[i][j]; //CONDICAO FRONTEIRA R = 0 NEUMANN
 					}
-					
-				}else{
-					RHS(i,j) = RHS(i,j) - VIN * phis[i][j]; // voltage of the wall	
-			
 				}
+				//}else{
+				//	RHS(i,j) = RHS(i,j) - VIN * phis[i][j]; // voltage of the wall	
+			
+				//}
 			}
 
 			else if (i == r_size-1){
@@ -59,29 +59,29 @@ PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VI
 					if (r_size > 1){
 						phic[i][j] = phic[i][j] + phin[i][j]; //CONDICAO FRONTEIRA R = MAX NEUMANN
 					}
-					
-				}else{
-					RHS(i,j) = RHS(i,j) - VWALL * phin[i][j]; // voltage of the wall
-
 				}
+				//}else{
+				//	RHS(i,j) = RHS(i,j) - VWALL * phin[i][j]; // voltage of the wall
+
+				//}
 			}
 
 			if (j == 0){
 
 				if(fronteira[0]){
 					phic[i][j] = phic[i][j] + phiw[i][j]; //CONDICAO FRONTEIRA z = min NEUMANN
-				}else{
-					RHS(i,j) = RHS(i,j) - V0 * phiw[i][j];
-				}		 
+				}//}else{
+				//	RHS(i,j) = RHS(i,j) - V0 * phiw[i][j];
+				//}		 
 			}
 
 			else if (j == z_size-1){
 
 				if (fronteira[1]){
 					phic[i][j] = phic[i][j] + phie[i][j]; //CONDICAO FRONTEIRA z = MAX NEUMANN
-				}else{
-					RHS(i,j) = RHS(i,j) - VMAX * phie[i][j];
-				}
+				}//}else{
+				//	RHS(i,j) = RHS(i,j) - VMAX * phie[i][j];
+				//}
 			}
 		}
 	}
@@ -141,6 +141,48 @@ PoissonSolver2D::PoissonSolver2D(double V0, double VMAX, double VWALL, double VI
     //std::cout << "Time taken to Load PHI's (coeffecients): " << d2.count() << " ms" << std::endl;
 }
 
+void PoissonSolver2D::update_boundary_voltage(double fronteira[4], double V0, double VMAX, double VWALL, double VIN){
+
+	int r_size = simul.get_r_size();
+	int z_size = simul.get_z_size(); 
+
+	Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RHS = Eigen::MatrixXd::Zero(r_size, z_size);
+	RHS = rhs_i;
+
+	double **phie = simul.get_phie();
+	double **phiw = simul.get_phiw();
+	double **phin = simul.get_phin();
+	double **phis = simul.get_phis();
+
+	for (int j = 0; j < z_size; j++){
+
+		if (!fronteira[2]){
+			RHS(0,j) = RHS(0,j) - VIN * phis[0][j];
+		}
+
+		if (!fronteira[3]){
+			RHS(r_size-1,j) = RHS(r_size-1,j) - VWALL * phin[r_size-1][j];
+		}
+	}
+
+	for (int i = 0; i < r_size; i++){
+
+		if(!fronteira[0]){
+
+			RHS(i,0) = RHS(i,0) - V0 * phiw[i][0];
+
+		}
+
+		if (!fronteira[1]){
+
+			RHS(i,z_size-1) = RHS(i,z_size-1) - VMAX * phie[i][z_size-1];
+		}
+	}
+
+	
+	rhs_ii = RHS;
+}
+
 void PoissonSolver2D::solve(){
 
 	simul.update_charge_density(); // Update the charge density values
@@ -162,7 +204,7 @@ void PoissonSolver2D::solve(){
 	for (int i = 0; i < r_size; i++){
 		for (int j = 0; j < z_size; j++){
 
-			RHS(i,j) = rhs_i(i,j) + rho(i,j) * vols(i,j); // calculate the right hand side
+			RHS(i,j) = rhs_ii(i,j) + rho(i,j) * vols(i,j); // calculate the right hand side
 		}
 	}
 

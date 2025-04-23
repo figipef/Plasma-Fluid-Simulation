@@ -2,12 +2,14 @@
 
 Convection::Convection(){} 
 
-Convection::Convection(double _z_step, double _z_size, Eigen::MatrixXd _S_hori, Eigen::MatrixXd& _Ez1){
+Convection::Convection(double _z_step, double _z_size, Eigen::MatrixXd _S_hori, Eigen::MatrixXd& _Ez1, Eigen::MatrixXd& _Ez2){
 
 	z_step = _z_step;
 	z_size = _z_size;
 	S_hori = _S_hori;
 	Ez1 = _Ez1;
+	Ez2 = _Ez2;
+
 }
 
 double Convection::calcFlux_superbee(int i , int j ,double mu, double De, double dt, int currlim, Eigen::MatrixXd n, int charge){
@@ -48,7 +50,7 @@ double Convection::calcFlux_superbee(int i , int j ,double mu, double De, double
     } else if (j == z_size - 1) {
 
         double rw = (n(i,j-1) - n(i,j-2)) / (n(i,j) - n(i,j-1) + 1e-8);
-        double cw = (-dt * mu * Ez1(i,j-1)* -charge) / z_step;
+        double cw = (-dt * mu * Ez2(i,j-1)* -charge) / z_step;
 
         double rw_prime;
         if ( j == z_size - 2){
@@ -61,16 +63,16 @@ double Convection::calcFlux_superbee(int i , int j ,double mu, double De, double
 
         double nw;
 
-        if (mu * Ez1(i,j-1)* -charge <= 0) {
+        if (mu * Ez2(i,j-1)* -charge <= 0) {
             nw = n(i,j-1) + (phia(rw) / 2) * (1 - cw) * (n(i,j) - n(i,j-1));
         } else {
             nw = n(i,j) + (phia(rw_prime) / 2) * (1 - cw_prime) * (n(i,j-1) - n(i,j));
         }
 
-        flux_left = -mu * Ez1(i,j-1)* -charge * nw - (De / (z_step) * (n(i,j) - n(i,j-1)));
+        flux_left = -mu * Ez2(i,j-1)* -charge * nw - (De / (z_step) * (n(i,j) - n(i,j-1)));
         flux_right = 0;
         if (currlim == 1){
-        	double EField_star_left = std::max( std::abs(Ez1(i,j-1)), (De * std::abs(n(i,j) - n(i,j-1))) / (mu*z_step * std::max({n(i,j-1), n(i,j), 1e-8})));
+        	double EField_star_left = std::max( std::abs(Ez2(i,j-1)), (De * std::abs(n(i,j) - n(i,j-1))) / (mu*z_step * std::max({n(i,j-1), n(i,j), 1e-8})));
 
 	        if (std::abs(flux_left) > (EPS0 * EField_star_left) / (ECHARGE * dt)) {
 	            flux_left = (std::copysign(1.0, flux_left) * EPS0 * EField_star_left) / (ECHARGE * dt);
@@ -197,8 +199,8 @@ double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt,
 		double g_dc;
 		double g_cu;
 		double nw;
-		double vw = -mu * Ez1(i,j-1)* -charge;
-        if (mu * Ez1(i,j-1)* -charge <= 0) { // Velocidade nula ou positiva
+		double vw = -mu * Ez2(i,j-1)* -charge;
+        if (mu * Ez2(i,j-1)* -charge <= 0) { // Velocidade nula ou positiva
 
 			g_dc = (n(i, j) - n(i, j - 1))/z_step;
 			g_cu = (n(i, j - 1) - n(i, j - 2))/z_step;
@@ -216,11 +218,11 @@ double Convection::calcFlux_UNO3(int i , int j ,double mu, double De, double dt,
 		    nw = n(i,j) + 0.5 * std::copysign(1.0, vw) * (z_step - std::abs(vw) * dt) * g_c;
         }
 
-        flux_left = -mu * Ez1(i,j-1)* -charge * nw - (De / z_step) * (n(i,j) - n(i,j-1));
+        flux_left = -mu * Ez2(i,j-1)* -charge * nw - (De / z_step) * (n(i,j) - n(i,j-1));
     	flux_right = 0;
     	//flux_right = flux_left; // CHANGED
     	if ( currlim == 1){
-    		double EField_star_left = std::max( std::abs(Ez1(i,j-1)), (De * std::abs(n(i,j) - n(i,j-1))) / (mu*z_step * std::max({n(i,j-1), n(i,j), 1e-8})));
+    		double EField_star_left = std::max( std::abs(Ez2(i,j-1)), (De * std::abs(n(i,j) - n(i,j-1))) / (mu*z_step * std::max({n(i,j-1), n(i,j), 1e-8})));
 
         	if (std::abs(flux_left) > (EPS0 * EField_star_left) / (ECHARGE * dt)) {
         	    flux_left = (std::copysign(1.0, flux_left) * EPS0 * EField_star_left) / (ECHARGE * dt);

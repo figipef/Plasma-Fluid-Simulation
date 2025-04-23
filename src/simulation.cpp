@@ -32,7 +32,9 @@ Simulation::Simulation(int n, int m, double dr, double dz, std::vector<Specie>& 
 
 Simulation::Simulation(int n, int m, double dr, double dz, std::string _geom, Eigen::VectorXd& _eps, std::vector<Specie>& _species, std::vector<Chemistry>& _chemistries, int _grid_init, int _grind_end, double electron_energy, double sec_e_em_energy, double _gas_temp, double _gas_dens, double _gas_pres) : species(_species), chemistries(_chemistries), gas_dens(_gas_dens), gas_pres(_gas_pres){
  
+	//t = 0.48e-3;
 	t = 0;
+
 	gas_temp = _gas_temp;
 
 	secondary_emission_energy = sec_e_em_energy;
@@ -183,122 +185,66 @@ void Simulation::update_charge_density(){
 
 void Simulation::push_time(int int_mode, double& j_l, double& j_r, Eigen::MatrixXd& last_flux){
 
-	Convection conv(z_step, z_size, S_hori, ez1);
+	// ------- Variable intialization --------
+
+	Convection conv(z_step, z_size, S_hori, ez1, ez2);
 	double dt;
 
-	// To calculate the electron temperature
-	const double k_B = 8.617333e-5;  // Boltzmann constant in eV/K
-    const double e = 1.602176634e-19; // Elementary charge in C
+	double A_cvt = 0.25;
+	double A_dif = 0.25;
 
-	Eigen::MatrixXd mu = Eigen::MatrixXd::Zero(r_size, z_size);
-	Eigen::MatrixXd De = Eigen::MatrixXd::Zero(r_size, z_size);
-
-	Eigen::MatrixXd mu_energy = Eigen::MatrixXd::Zero(r_size, z_size);
-	Eigen::MatrixXd De_energy = Eigen::MatrixXd::Zero(r_size, z_size);
-
-	Eigen::MatrixXd mu_gas = Eigen::MatrixXd::Zero(r_size, z_size);
-	Eigen::MatrixXd De_gas = Eigen::MatrixXd::Zero(r_size, z_size);
+    // Initialize necessary matrices
 
 	Eigen::MatrixXd Se = Eigen::MatrixXd::Zero(r_size, z_size);
-	Eigen::MatrixXd e_ener = Eigen::MatrixXd::Zero(r_size, z_size);
+	e_ener = Eigen::MatrixXd::Zero(r_size, z_size);
 
 	Eigen::MatrixXd electron_fluxes = Eigen::MatrixXd::Zero(r_size, z_size); // To be used by electron energy after
 
 	std::vector<Eigen::MatrixXd> reaction_matrix; // Reaction matrix list
 
-	// Fill the reactions matrices
-	for (Chemistry& c : chemistries){ 
-		Eigen::MatrixXd mat = Eigen::MatrixXd::Zero(r_size, z_size);
-		reaction_matrix.push_back(mat);
-	}
+	// Fill the reactions matrices with blanks
+	reaction_matrix.resize(chemistries.size(), Eigen::MatrixXd::Zero(r_size, z_size));
 
-	for (int i = 0; i < r_size; i++){
-	
-		for (int j = grid_init; j < grid_end; ++j){
 
-			e_ener(i,j) = species.back().get_density()(i,j) / (species[0].get_density()(i,j) + 1e-308);
+	// ------- ALGORITHM ------
 
-			// Set the values of the reaction matrix using the electron energy
-			int counter = 0;
-			for (Chemistry& c : chemistries){ // Cycle through the reactions to calculate (8)
-				reaction_matrix[counter](i,j) = c.calc_reaction_rate(e_ener(i,j)) * c.reagents[0].get_density()(i,j) * c.reagents[1].get_density()(i,j); // Calculate R_i for each reaction
-				counter++;
-			}
+	calc_e_energy(e_ener); // Update the electron energy matrix
 
-			if (e_ener(i,j) <= 0.025){
-				mu(i,j) = 6.4e25/gas_dens;
-			} else if (e_ener(i,j) > 0.025 && e_ener(i,j) <= 0.14){
-				mu(i,j) = 2.831166363547715e+27*std::exp(0.9628859587344575*std::log(e_ener(i,j)))/gas_dens; 
-			} else {
-				mu(i,j) = 4.289500273955298e+25*std::exp(-1.2096423778714385*std::log(e_ener(i,j)))/gas_dens; 
-			}
+	calc_reaction_vector(reaction_matrix, e_ener); // Calculate the R_i for all the reactions
 
-			De(i,j) = mu(i,j) * e_ener(i,j) * 2/3;
+	calc_update_species_coeffs(e_ener); // Calculates & Updates the Difusion and Mobility coeffectients for the species
 
-			mu_energy(i,j) = mu(i,j) * 5/3;
-			De_energy(i,j) = mu_energy(i,j) * e_ener(i,j) * 2/3;
+	calc_time_step(dt, A_cvt, A_dif); // Calculates the timestep, dt, dinamically
 
-			mu_gas(i,j) = 0.12/gas_pres;
-		}
-	}
-
-	for (Eigen::MatrixXd a:reaction_matrix){
-		//std::cout <<a<<"\n";
-	}
-	//std::cout <<e_ener<< std::endl;
-	//std::cout <<mu<<"\n";
-
-	//std::cout <<De<<"\n";
-	// Calculate Fluxes at each cell
-
-	double vr_max = 1e-308;
-	if ( r_size > 1){
-		vr_max = std::abs(mu.maxCoeff() * er.maxCoeff());
-	}
-
-	double vz_max = std::max({std::abs(mu.maxCoeff() * ez1.maxCoeff()), std::abs(mu.maxCoeff() * ez2.maxCoeff()), 1e-308});
-
-	//dt = std::min({0.125 * z_step/vz_max, 0.25* z_step*z_step/De, 0.5 * 8.85e-12/(mu * ne.maxCoeff()* 1.6e-19)});
-	
-	double A_cvt = 0.2;
-	double A_dif = 0.2;
-
-	if (r_size == 1){
-	
-		dt = std::min({A_cvt * z_step/(vz_max + 1e-308), A_dif* z_step*z_step/(De.maxCoeff() + 1e-308)});
-	
-	} else {
-	
-		dt = std::min({A_cvt * z_step/vz_max, A_cvt * r_step/vr_max, A_dif* z_step*z_step/De.maxCoeff(), A_dif * r_step*r_step/De.maxCoeff()});
-	
-	}
 
 	//dt = 1e-13;
 	//dt = 20e-12;
 
-	int counter = 0; // FOR TESTING PURPOSES REMOVE WHEN DONE, only applied to the first integration mode
+	// In class or function-scope storage
+	std::vector<Eigen::MatrixXd> new_n_all(species.size(), Eigen::MatrixXd::Zero(r_size, z_size));
+	std::vector<Eigen::MatrixXd> midfluxn_all(species.size(), Eigen::MatrixXd::Zero(r_size, z_size));
 
-	for (Specie& s : species){
+	for (size_t s_idx = 0; s_idx < species.size(); ++s_idx) {
 
-		counter++;
+    	Specie& s = species[s_idx];
+		// Booleans for the flux cases
+		bool is_electron = (&s == &species[0]);
+		bool is_energy = (&s == &species.back());
+		bool is_gas = (s.get_name() == "Ar"); // this could be cached/indexed too
 
-		if (s.get_name() == species[0].get_name()){
-			s.update_mob_coef(mu);
-			s.update_dif_coef(De);
-		} else if (s.get_name() == species.back().get_name()) {
-			s.update_mob_coef(mu_energy);
-			s.update_dif_coef(De_energy);
-		} else if (s.get_charge() != 0){ // Only for ions
-			s.update_mob_coef(mu_gas);
-			s.update_dif_coef(De_gas); // In this case the diffusion matrix is zeo
-		} else { // For the other species (in this case should be the 0th matrix)
-			s.update_mob_coef(De_gas); // In this case the diffusion matrix is zeo
-			s.update_dif_coef(De_gas); // In this case the diffusion matrix is zeo
-		}
+		// Matrices are alocated
+		Eigen::MatrixXd& new_n = new_n_all[s_idx];
+		Eigen::MatrixXd& midfluxn = midfluxn_all[s_idx];
+		new_n.setZero();
+		midfluxn.setZero();
 
-		Eigen::MatrixXd new_n = Eigen::MatrixXd::Zero(r_size, z_size);
-		Eigen::MatrixXd new_new_n = Eigen::MatrixXd::Zero(r_size, z_size);
-		Eigen::MatrixXd midfluxn = Eigen::MatrixXd::Zero(r_size, z_size);
+		// Save the species matrices to optimize the calculations
+    	const auto& dens = s.get_density();
+    	const auto& mob = s.get_mob_coef();
+    	const auto& dif = s.get_dif_coef();
+
+    	const auto& elec_dens = species[0].get_density();
+		//Eigen::MatrixXd new_new_n = Eigen::MatrixXd::Zero(r_size, z_size); FOR THE THE OTHER INTEGRATION METHODS
 
 		if (int_mode == 0){
 
@@ -306,26 +252,20 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r, Eigen::Matrix
 		
 				for (int j = grid_init; j < grid_end; ++j){ // changed from 0 and z _size to 1 and z_size - 1
 
-					// Calculate the Reactions at the cell i,j
-					double temp_S = 0; // temporary sum dummy variable
-					int counter = 0;
-					for (Chemistry& c : chemistries){ // Cycle through the reactions to calculate (8)
-
-						temp_S = temp_S + s.react_net[counter] * reaction_matrix[counter](i,j); // Calculate R_i for each reaction
-						counter++;
-					}
-
-					Se(i,j) = temp_S;
+					// Change to calculate outside i,j loop
+					Se(i,j) = calc_net_reaction_source(s,i,j, reaction_matrix); // Calculate the Creation term according to all reactions
 
 					double aux_flux = 0;
 
 					if (j == grid_init || j == grid_end - 1){ // Special border cases for fluxes
-
-						if (s.get_name() == species[0].get_name()){
-
+						
+						if (is_electron){
+							//std::cout <<Se<<"\n"<<j<<"\n\n";
+							//std::cout << mob<<"\n\n";
+							//std::cout << dif<<"\n\n";
 							// For the electrons
 
-							aux_flux = -0.5 * s.get_density()(i,j) * calc_vthermal(s, e_ener(i,j) * 11606. * 2/3); // Base electron wall fluxes
+							aux_flux = -0.5 * dens(i,j) * calc_vthermal(s, e_ener(i,j) * 11606. * 2/3); // Base electron wall fluxes
 							//std::cout << "e "<< calc_vthermal(s, e_ener(i,j) * 11606. * 2/3)<<"\n";
 
 							for (Specie& ss : species){ // Sum the fluxes of p species
@@ -338,11 +278,11 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r, Eigen::Matrix
 
 							//std::cout<< s.get_name() << j<<std::endl;
 
-						} else if (s.get_name() == species.back().get_name()) {
+						} else if (is_energy) {
 							
 							// For the electron energy density specie
 
-							aux_flux = -2/3 * s.get_density()(i,j) * calc_vthermal(s, e_ener(i,j) * 11606. * 2/3); // Base electron wall fluxes
+							aux_flux = -2/3 * dens(i,j) * calc_vthermal(s, e_ener(i,j) * 11606. * 2/3); // Base electron wall fluxes
 
 							//std::cout << "e_ene "<< calc_vthermal(s, e_ener(i,j) * 11606. * 2/3)<<"\n";
 
@@ -358,7 +298,7 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r, Eigen::Matrix
 
 						// For the other species
 
-						} else if (s.get_name() == "Ar") {
+						} else if (is_gas) {
 
 							//aux_flux = -0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j); // Probably needs to be the sum of the excited and charged species
 							
@@ -367,25 +307,27 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r, Eigen::Matrix
 									aux_flux = aux_flux + 1 * 0.5 * ss.get_density()(i,j) * calc_vthermal(ss, gas_temp);
 								}
 							}
+
+							aux_flux = aux_flux * S_hori(i,j);
 							//std::cout <<" gases "<<calc_vthermal(s, gas_temp) << "\n";
 
 						} else{
 
-							aux_flux = -0.5 * s.get_density()(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j);
+							aux_flux = -0.5 * dens(i,j) * calc_vthermal(s, gas_temp) * S_hori(i,j);
 							//std::cout <<" gases "<<calc_vthermal(s, gas_temp) << "\n";
 						}
-
-						if (j == grid_init && s.get_name() != species.back().get_name()){ // Verificar que nao é feito na energia eletronica
+						
+						if (j == grid_init && !is_energy){ // Verificar que nao é feito na energia eletronica
 							j_l = j_l + aux_flux * s.get_charge() * 1.6e-19; // Can be optimized if the real value of charge is saved in Specie 
 						}
 
-						if (j == grid_end - 1  && s.get_name() != species.back().get_name()){
+						if (j == grid_end - 1  && !is_energy){
 
 							j_r = j_r + aux_flux * s.get_charge() * 1.6e-19; // Can be optimized if the real value of charge is saved in Specie 
 						}
 					}
 
-					if (s.get_name() == species.back().get_name()) { // Calculate the Creation for the electron energy
+					if (is_energy) { // Calculate the Creation for the electron energy
 
 						double temp_sum = 0;
 
@@ -393,20 +335,25 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r, Eigen::Matrix
 							temp_sum = temp_sum + c.calc_reaction_rate(e_ener(i,j)) * c.reagents[1].get_density()(i,j) * c.react_energy_delta; 
 						}
 
-						Se(i,j) = - last_flux(i,j) * ez1(i,j) * 1.6e-19 - species[0].get_density()(i,j) * temp_sum;
+						if (j == grid_end-1){
+							Se(i,j) = - last_flux(i,j) * ez2(i,j) * 1.6e-19 - elec_dens(i,j) * temp_sum;
+						} else {
+							Se(i,j) = - last_flux(i,j) * ez1(i,j) * 1.6e-19 - elec_dens(i,j) * temp_sum;
+						}
+						
 					}
 
-					midfluxn(i,j) =  conv.calcFlux_UNO3(i, j, s.get_mob_coef()(i,j), s.get_dif_coef()(i,j), dt, 1, s.get_density(), s.get_charge(), grid_init, grid_end);
-					new_n(i, j) = s.get_density()(i, j) + dt * ((midfluxn(i, j) + aux_flux)/vols(i, j) + Se(i,j));
+					midfluxn(i,j) =  conv.calcFlux_UNO3(i, j, mob(i,j), dif(i,j), dt, 1, dens, s.get_charge(), grid_init, grid_end);
+					new_n(i, j) = dens(i, j) + dt * ((midfluxn(i, j) + aux_flux)/vols(i, j) + Se(i,j));
 
-					if (s.get_name() == species[0].get_name()){
+					if (is_electron){
 						//std::cout << midfluxn(i, j) << " "<< aux_flux<<"\n";
 						electron_fluxes(i,j) = midfluxn(i, j) + aux_flux; // Save the electron fluxes to calculate the electron energy creation 
 					}
 				}
 			}
 
-		} else if (int_mode == 1){
+		}/* else if (int_mode == 1){
 
 			for (int i = 0; i < r_size; i++){
 		
@@ -491,38 +438,43 @@ void Simulation::push_time(int int_mode, double& j_l, double& j_r, Eigen::Matrix
 				}
 			}
 		
-		}
+		}*/
 
-		//if (s.get_name() == species[0].get_name()){std::cout<<"Density matrix: "<<s.get_density()<<std::endl;}
-		
-		s.update_density(new_n);
+		new_n_all[s_idx] = new_n;
+		//s.update_density(new_n); // Probably will need to only update the densities after, as to not make the error of sing the ipdated densities in the wrong timestep
+	}
+
+	for (size_t s_idx = 0; s_idx < species.size(); ++s_idx) {
+		species[s_idx].update_density(new_n_all[s_idx]);
 	}
 
 	last_flux = electron_fluxes;
 
-	//ne = new_n;
-	//ni = new_ni;
-
 	t = t+dt; // UPDATE TIME
-	//std::cout <<dt<<std::endl;
-	//solve_Poisson();
 
-	//write_dt(dt_file, dt);
-
-	//if ( ti % 999 == 0){
-		//std::cout <<De<<std::endl;
-		//std::cout <<Se*dt<<std::endl;
-
-	//std::cout << " t = "<<t<<std::endl;
-	//std::cout << " dt =" <<dt<<std::endl;
-	//}	
 }
 
-void Simulation::write_dens(std::ofstream& file){
+void Simulation::write_dens(std::ofstream& file, int i){
 	//std::cout << std::fixed << std::setprecision(21);
 	//std::cout<<"Density writen at "<<Pot<<std::endl;
 	file << "Time: " << t << "\n";
-    file << species[0].get_density() << "\n";
+    file << species[i].get_density() << "\n";
+    file << "----\n";  // Separator for the next matrix 
+}
+
+void Simulation::write_efield(std::ofstream& file){
+	//std::cout << std::fixed << std::setprecision(21);
+	//std::cout<<"Density writen at "<<Pot<<std::endl;
+	file << "Time: " << t << "\n";
+    file << ez1 << "\n";
+    file << "----\n";  // Separator for the next matrix 
+}
+
+void Simulation::write_e_energy(std::ofstream& file){
+	//std::cout << std::fixed << std::setprecision(21);
+	//std::cout<<"Density writen at "<<Pot<<std::endl;
+	file << "Time: " << t << "\n";
+    file << e_ener << "\n";
     file << "----\n";  // Separator for the next matrix 
 }
 
@@ -634,3 +586,145 @@ double Simulation::calc_vthermal(Specie specie, double temp){
 	return sqrt(8 * 1.380649e-23 * temp / (M_PI * specie.get_mass()));
 }
 
+void Simulation::calc_e_energy(Eigen::MatrixXd& e_ener){
+
+	Eigen::MatrixXd ne = species[0].get_density();
+	Eigen::MatrixXd e_ne = species.back().get_density();
+
+
+	for (int i = 0; i < r_size; i++){
+	
+		for (int j = grid_init; j < grid_end; ++j){
+
+			e_ener(i,j) = e_ne(i,j) / (ne(i,j) + 1e-308);
+		}
+	}
+}
+
+void Simulation::calc_reaction_vector(std::vector<Eigen::MatrixXd>& reaction_matrix, Eigen::MatrixXd e_ener){
+
+	int idx = 0;
+
+	for (Chemistry& c : chemistries){
+
+		Eigen::MatrixXd n0 = c.reagents[0].get_density();
+		Eigen::MatrixXd n1 = c.reagents[1].get_density();
+
+		for (int i = 0; i < r_size; i++){
+		
+			for (int j = grid_init; j < grid_end; ++j){
+	
+				reaction_matrix[idx](i,j) = c.calc_reaction_rate(e_ener(i,j)) * n0(i,j) * n1(i,j); // Calculate R_i for each reaction
+
+			}
+		}
+
+		idx ++;
+	}
+}
+
+void Simulation::calc_update_species_coeffs(Eigen::MatrixXd e_ener) {
+
+    Eigen::MatrixXd e_mu = Eigen::MatrixXd::Zero(r_size, z_size); // Electron mobility coefficients
+    Eigen::MatrixXd e_De = Eigen::MatrixXd::Zero(r_size, z_size); // Electron diffusion coefficients
+
+    std::string first_name = species.front().get_name();
+    std::string last_name  = species.back().get_name();
+
+    // Precompute electron mobility and diffusion
+    for (int i = 0; i < r_size; ++i) {
+        for (int j = grid_init; j < grid_end; ++j) {
+            double ener = e_ener(i, j);
+            if (ener <= 0.025) {
+                e_mu(i, j) = 6.4e25 / gas_dens;
+            } else if (ener <= 0.14) {
+                e_mu(i, j) = 2.831166363547715e+27 * std::pow(ener, 0.9628859587344575) / gas_dens;
+            } else {
+                e_mu(i, j) = 4.289500273955298e+25 * std::pow(ener, -1.2096423778714385) / gas_dens;
+            }
+            e_De(i, j) = e_mu(i, j) * ener * 2.0 / 3.0;
+        }
+    }
+
+    // Loop over species
+    for (Specie& s : species) {
+        Eigen::MatrixXd mu = Eigen::MatrixXd::Zero(r_size, z_size);
+        Eigen::MatrixXd De = Eigen::MatrixXd::Zero(r_size, z_size);
+
+        const std::string& name = s.get_name();
+        int charge = s.get_charge();
+
+        if (name == first_name) {
+            s.update_mob_coef(e_mu);
+            s.update_dif_coef(e_De);
+        } 
+        else if (name == last_name) {
+            for (int i = 0; i < r_size; ++i) {
+                for (int j = grid_init; j < grid_end; ++j) {
+                    mu(i, j) = e_mu(i, j) * 5.0 / 3.0;
+                    De(i, j) = mu(i, j) * e_ener(i, j) * 2.0 / 3.0;
+                }
+            }
+            s.update_mob_coef(mu);
+            s.update_dif_coef(De);
+        } 
+        else if (charge != 0) {
+            mu.setConstant(0.12 / gas_pres);
+            s.update_mob_coef(mu);
+            s.update_dif_coef(De); // De is already zero
+        } 
+        else {
+            s.update_mob_coef(mu); // mu is already zero
+            s.update_dif_coef(De); // De is already zero
+        }
+    }
+}
+
+void Simulation::calc_time_step(double& dt, double A_cvt, double A_dif){
+
+	
+    const Eigen::MatrixXd& mu = species[0].get_mob_coef(); // Get the electron and diffusion coeffecients
+    const Eigen::MatrixXd& De = species[0].get_dif_coef();
+
+    const double mu_max = mu.maxCoeff();
+    const double De_max = De.maxCoeff();
+    const double eps = 1e-308;
+
+    const double vz_max = std::max({
+        std::abs(mu_max * ez1.maxCoeff()),
+        std::abs(mu_max * ez2.maxCoeff()),
+        eps
+    });
+
+    // this comment still has the dieletric relaxation consideration 
+	//dt = std::min({0.125 * z_step/vz_max, 0.25* z_step*z_step/De, 0.5 * 8.85e-12/(mu * ne.maxCoeff()* 1.6e-19)});
+	
+	if (r_size == 1) { // for 1 dimension
+
+        dt = std::min({
+            A_cvt * z_step / (vz_max + eps),
+            A_dif * z_step * z_step / (De_max + eps)
+        });
+
+        //std::cout << De_max<<"\n";
+
+    } else { // for 2 dimensions
+
+        const double vr_max = std::max(std::abs(mu_max * er.maxCoeff()), eps);
+
+        dt = std::min({
+            A_cvt * z_step / (vz_max + eps),
+            A_cvt * r_step / (vr_max + eps),
+            A_dif * z_step * z_step / (De_max + eps),
+            A_dif * r_step * r_step / (De_max + eps)
+        });
+    }
+}
+
+double Simulation::calc_net_reaction_source(const Specie& s, int i, int j, const std::vector<Eigen::MatrixXd> reaction_matrix) {
+    double result = 0;
+    for (size_t k = 0; k < chemistries.size(); ++k) {
+        result += s.react_net[k] * reaction_matrix[k](i, j);
+    }
+    return result;
+}

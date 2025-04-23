@@ -14,7 +14,9 @@ class PoissonSolver2D{
 	
 		PoissonSolver2D();
 
-		PoissonSolver2D(double, double, double, double, double[4], Eigen::VectorXd&, Simulation&); 
+		PoissonSolver2D(double[4], Eigen::VectorXd&, Simulation&); 
+
+		void update_boundary_voltage(double[4], double, double, double, double);
 
 		void solve();
 
@@ -23,7 +25,8 @@ class PoissonSolver2D{
 		// Variables for the initialization of the Solver
 		Simulation& simul;
 
-		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> rhs_i;
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> rhs_i;  // Right hand side only considering the PHI's
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> rhs_ii; // Right hand-side considering the boundary voltages
 		Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
 		Eigen::VectorXd sig;
 

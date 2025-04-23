@@ -149,14 +149,14 @@ int main() {
 
     Chemistry r4 = Chemistry(2,2, r4_reag, r4_prod, 0, 4.3, 1.16698343e-13, 9.08521436e-03, 1.21470021e+00); // StepWize
 
-    double constant_rate_r5 = 3.4e8 /6.022e-23;
+    double constant_rate_r5 = 3.4e8 / 6.022e-23;
 
     Specie r5_reag[2] = {argon_star, argon_star};
     Specie r5_prod[3] = {electron, argon, argon_plus};
 
     Chemistry r5 = Chemistry(2,2, r5_reag, r5_prod, 1, 0, constant_rate_r5, 0, 0);
 
-    double constant_rate_r6 = 1807 /6.022e-23;
+    double constant_rate_r6 = 1807 / 6.022e-23;
 
     Specie r6_reag[2] = {argon_star, argon};
     Specie r6_prod[2] = {argon, argon};
@@ -182,63 +182,111 @@ int main() {
 
     // NEW MAIN FROM HERE
 
-    Simulation simul(size_r, grid_size, 20.0e-6, grid_step, "cartesian", eps, species, chemistries, grid_init, grid_end, electron_mean_energy, secondary_electron_mean_energy, gas_temp, gas_density, gas_pressure);
-    std::ofstream file("rho_data.txt");
+    Simulation simul(size_r, grid_size, 20.0e0, grid_step, "cartesian", eps, species, chemistries, grid_init, grid_end, electron_mean_energy, secondary_electron_mean_energy, gas_temp, gas_density, gas_pressure);
     
+    std::ofstream file_e_dens("../output/e_dens.txt");
+    std::ofstream file_ar_dens("../output/ar_dens.txt");
+    std::ofstream file_arplus_dens("../output/arplus_dens.txt");
+    std::ofstream file_arstar_dens("../output/arstar_dens.txt");
+    std::ofstream file_time_steps("../output/time_steps.txt");
+    std::ofstream file_current_dens("../output/current_dens.txt");
+    std::ofstream file_e_field("../output/e_field.txt");
+    std::ofstream file_e_energy("../output/e_energy.txt");
+
     int a = 0;
 
     Eigen::MatrixXd electron_fluxes = Eigen::MatrixXd::Zero(size_r, grid_size); // To be used by electron energy after an iteration
 
-    std::unique_ptr<PoissonSolver2D> solver = std::make_unique<PoissonSolver2D>(
-        left_potential * sin(2 * M_PI * frequency * 0.0),
-        right_potential, 0, 0, fronteira_livre, sig, simul
-    );
+    PoissonSolver2D solver(fronteira_livre, sig, simul);
 
-    while (simul.get_t() <= 5e-5) {
+    auto start = std::chrono::high_resolution_clock::now();
 
-        if (a%1000 == 0){
-
-            solver = std::make_unique<PoissonSolver2D>(
-                left_potential * sin(2 * M_PI * frequency * simul.get_t()),
-                right_potential, 0, 0, fronteira_livre, sig, simul
-            );
-
-        }
+    while (simul.get_t() <= 10e-6) {
+    //while (a < 1) {    
+        //if (a%1000 == 0){
+        //    solver = std::make_unique<PoissonSolver2D>(fronteira_livre, sig, simul);
+        //}
 
         //PoissonSolver2D solver(left_potential*sin(2*3.1416*frequency * simul.get_t()),right_potential,0,0,fronteira_livre,sig,simul);
         
         //std::cout <<left_potential*sin(frequency * simul.get_t())<<std::endl;
         double j_left = 0;
         double j_right = 0;
-        solver->solve();
+        
+        solver.update_boundary_voltage(fronteira_livre, left_potential*sin(2*3.1416*frequency * (simul.get_t())),right_potential,0,0);
+
+        auto start1 = std::chrono::high_resolution_clock::now();
+
+        solver.solve();
         //std::cout << simul.get_Ez1()<<std::endl;
 
+        auto start2 = std::chrono::high_resolution_clock::now();
 
         //std::cout <<a<<std::endl;
-        a++;
+        
         double old_t = simul.get_t();
         simul.push_time(0, j_left, j_right, electron_fluxes);
+        
+        auto start3 = std::chrono::high_resolution_clock::now();
+
         if (a%10000 == 0){
-            std::cout << "voltage :" <<left_potential*sin(2*3.1416*frequency * simul.get_t())<<"\n";
+            //std::cout << "voltage :" <<left_potential*sin(2*3.1416*frequency * (simul.get_t()))<<"\n";
             std::cout<< "time "<<simul.get_t()<<std::endl;
             double dt = simul.get_t() - old_t; // Get the time step for the sigma calculation
-            std::cout<< "dt "<<dt<<std::endl;
-            simul.write_dens(file);
+            //std::cout<< "dt "<<dt<<std::endl;
+
+            // Saving values
+
+            simul.write_dens(file_e_dens, 0);
+            simul.write_dens(file_ar_dens, 1);
+            simul.write_dens(file_arstar_dens, 2);
+            simul.write_dens(file_arplus_dens, 3);
+
+            simul.write_efield(file_e_field);
+
+            simul.write_e_energy(file_e_energy);
+
+            file_time_steps << "Potencial on left: "<<left_potential*sin(2*3.1416*frequency * (simul.get_t())) << " dt: "<< dt << "\n";
+            file_current_dens <<  j_left << " | "<< j_right << "\n";
+
+            //std::cout << simul.get_Ez1()<<"\n";
+            //std::cout<< j_left<<"   "<< j_right<<"\n";
         }
         
+        a++;
 
         double dt = simul.get_t() - old_t; // Get the time step for the sigma calculation
 
         sig(grid_init - 1) = sig(grid_init - 1) + dt * j_left; // Check com o professor se faz sentido
         sig(grid_end - 1) = sig(grid_end - 1) + dt * j_right;
 
+        auto start4 = std::chrono::high_resolution_clock::now();
         //for (Specie& s : species){
         //    std::cout <<"especies "<<s.get_density()<<"\n";
         //}
-
+        auto duration1 = std::chrono::duration_cast<std::chrono::nanoseconds>(start1 - start);
+        auto duration2 = std::chrono::duration_cast<std::chrono::nanoseconds>(start2 - start1);
+        auto duration3 = std::chrono::duration_cast<std::chrono::nanoseconds>(start3 - start2);
+        auto duration4 = std::chrono::duration_cast<std::chrono::nanoseconds>(start4 - start3);
+        //std::cout << "Time taken1: " << duration1.count() << " seconds" << std::endl;
+        //std::cout << "Time taken2: " << duration2.count() << " seconds" << std::endl;
+        //std::cout << "Time taken3: " << duration3.count() << " seconds" << std::endl;
+        //std::cout << "Time taken4: " << duration4.count() << " seconds" << std::endl;
     }
+
+     // End timer
+    auto end = std::chrono::high_resolution_clock::now();
+
+    // Calculate duration in microseconds
+    std::chrono::duration<double> duration = end - start;
+
+    // Print or save the duration
+    std::cout << "Time taken: " << duration.count() << " seconds" << std::endl;
+
+
+
     std::cout<< "iter "<<a<<std::endl;
-    simul.write_dens(file);
+    simul.write_dens(file_e_dens, 0);
     
     return 0;
 }
