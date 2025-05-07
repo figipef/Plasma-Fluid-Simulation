@@ -21,10 +21,253 @@
 #include <sstream>
 #include <unordered_map>
 
-double epsi =8.85418781762e-12;
+double epsi = 8.85418781762e-12;
+
+double charge = 1.6e-19;
 
 double no_epsi = 1;
 
+std::vector<double> computeCellCenters(const std::vector<double>& distances, const std::vector<int>& cellCounts) {
+    std::vector<double> centers;
+
+    if (distances.size() != cellCounts.size()) {
+        throw std::invalid_argument("distances and cellCounts must have the same size");
+    }
+
+    double x_start = 0.0;
+    for (size_t i = 0; i < distances.size(); ++i) {
+        double dx = distances[i] / cellCounts[i];
+        for (int j = 0; j < cellCounts[i]; ++j) {
+            double x_center = x_start + (j + 0.5) * dx;
+            centers.push_back(x_center);
+        }
+        x_start += distances[i];
+    }
+
+    return centers;
+}
+
+std::vector<double> computeCellEdges(const std::vector<double>& centers) {
+    std::vector<double> edges;
+    size_t N = centers.size();
+
+    if (N == 0) return edges;
+
+    edges.reserve(N + 1);
+
+    // First edge extrapolated on the left
+    edges.push_back(centers[0] - 0.5 * (centers[1] - centers[0]));
+
+    // Interior edges: average of neighboring centers
+    for (size_t i = 0; i < N - 1; ++i) {
+        edges.push_back(0.5 * (centers[i] + centers[i + 1]));
+    }
+
+    // Last edge extrapolated on the right
+    edges.push_back(centers[N - 1] + 0.5 * (centers[N - 1] - centers[N - 2]));
+
+    return edges;
+}
+
+std::vector<double> computeEastPoissonCoefficients(const std::vector<double>& permitivity, const std::vector<double>& centers, const std::vector<double>& edges) {
+    
+    // Function to calculate the East Poisson coeffecients
+
+    std::vector<double> coeffecients;
+    size_t N = permitivity.size();
+    
+    if (N == 0) return coeffecients;
+    
+    coeffecients.reserve(N);
+    
+    for (size_t i = 0; i < N - 1; ++i) {
+
+        // Calculate the east coefficient for all interior cells, except the last one
+        double value = - 1.0 * (permitivity[i] * permitivity[i+1])/((permitivity[i+1]*(edges[i+1] - centers[i]))+(permitivity[i] * (centers[i+1] - edges[i+1])));
+
+        coeffecients.push_back(value);
+    }
+     
+    // The last value is for the ghost cell, so it is used the previous obtained coeffecient
+    coeffecients.push_back(coeffecients[N-2]);
+
+    return coeffecients;
+}   
+
+std::vector<double> computeWestPoissonCoefficients(const std::vector<double>& east_coeffs){
+    // Function to calculate the West Poisson coeffecients
+
+    std::vector<double> west_coeffs;
+    size_t N = east_coeffs.size();
+
+    // The first value is for the ghost cell, so it is used the next obtained coeffecient 
+    west_coeffs.push_back(east_coeffs[0]);
+
+    for (size_t i = 0; i < N-1; ++i) {
+
+        west_coeffs.push_back(east_coeffs[i]);
+    }
+
+    return west_coeffs;
+}   
+
+std::vector<double> computeCenterPoissonCoefficients(const std::vector<double>& east_coeffs, const std::vector<double>& west_coeffs){
+    // Calculates the Center Poisson Coefficients
+
+    std::vector<double> center_coeffs;
+    size_t N = east_coeffs.size();
+
+
+    for (size_t i = 0; i < N; ++i) {
+
+        center_coeffs.push_back(-1.0*(east_coeffs[i] + west_coeffs[i]));
+    }
+
+    return center_coeffs;
+}
+
+std::vector<int> computeSigmaMask(const std::vector<int>& positions, const int& N_grid){
+
+    // Return a Mask with 0's and 1's for the Interfaces with surface charges
+    size_t N = positions.size();
+    std::vector<int> sigma_mask(N_grid - 1, 0);
+
+    for (size_t i = 0; i < N; ++i) {
+
+        sigma_mask[positions[i]] = 1;
+    } 
+
+    return sigma_mask;   
+}
+
+std::vector<double> computeSigmaCoefficients(const std::vector<int>& sigma_mask, const std::vector<double>& permitivity, const std::vector<double>& centers, const std::vector<double>& edges){
+    // Calculates the Right Hand Side Surface Charge coeffecients (before and after the surface)
+
+    std::vector<double> sigma_coeffs;
+    size_t N = permitivity.size();
+
+
+    for (size_t i = 0; i < N; ++i) {
+
+        if (sigma_mask[i] && i < N-1){
+            double value = permitivity[i] * (centers[i+1] - edges[i + 1]) / ( permitivity[i] * (centers[i+1] - edges[i + 1]) + permitivity[i+1] * (edges[i+1] - centers[i]));
+            sigma_coeffs.push_back(value);
+        }
+        if (sigma_mask[i-1] && i > 0){
+            double value = permitivity[i] * (edges[i] - centers[i]) / ( permitivity[i - 1] * (centers[i] - edges[i]) + permitivity[i] * (edges[i] - centers[i - 1]));
+            sigma_coeffs.push_back(value);
+        }
+
+        if (i > 0 && !sigma_mask[i] && !sigma_mask[i-1]){
+            sigma_coeffs.push_back(0);
+        } else if ( i == 0  && !sigma_mask[i]){
+            sigma_coeffs.push_back(0);
+        }
+
+    }
+
+    return sigma_coeffs;
+}
+
+int main() {
+
+    // Relative permitivity (For DBD case)
+    double outer_rel_permitivity = 5;
+    double inner_rel_permitivity = 1;
+
+    // Distances between sections SI (m)
+    double d1 = 1e-4;
+    double d2 = 1e-4;
+    double d3 = 1e-4;
+
+    // Number of cells in sections
+    int c1 = 5;
+    int c2 = 5;
+    int c3 = 5;
+    
+    std::vector<double> distances = {d1, d2, d3}; // Distances between sections SI (m)
+    
+    std::vector<int> cellCounts = {c1, c2, c3}; // Number of cells in sections
+
+    std::vector<double> centers = computeCellCenters(distances, cellCounts);
+
+    int N = 0; // Number of internal Cells
+
+    for (size_t i = 0; i < cellCounts.size(); ++i) {
+        N += cellCounts[i];
+    }
+
+    std::cout << "Number of cells "<< N <<"\n";
+
+    // Print the first few centers for verification
+    for (size_t i = 0; i < centers.size(); ++i) {
+        std::cout << "x[" << i << "] = " << centers[i] << "\n";
+    }
+    std::vector<double> edges = computeCellEdges(centers);
+
+    // Print the first few edges for verification
+    for (size_t i = 0; i < edges.size(); ++i) {
+        std::cout << "edge[" << i << "] = " << edges[i] << "\n";
+    }
+
+    std::vector<double> permitivity(N);
+
+    for (int i = 0; i < N; i++){
+        if (i < cellCounts[0] || i >= N - cellCounts[2]){
+            permitivity[i] = epsi * outer_rel_permitivity; // for a e_r|| e_0 || e_r type system
+        } else {
+            permitivity[i] = epsi * inner_rel_permitivity;
+        }
+    }
+
+    for (size_t i = 0; i < N; ++i) {
+        std::cout << "Permitivity[" << i << "] = " << permitivity[i] << "\n";
+    }
+
+    std::vector<double> east_poisson_coeffecients = computeEastPoissonCoefficients(permitivity,centers, edges);
+
+
+    for (size_t i = 0; i < N; ++i) {
+        std::cout << "East Poisson Coeffecient[" << i << "] = " << east_poisson_coeffecients[i] << "\n";
+    }
+
+    std::vector<double> west_poisson_coeffecients = computeWestPoissonCoefficients(east_poisson_coeffecients);
+
+
+    for (size_t i = 0; i < N; ++i) {
+        std::cout << "West Poisson Coeffecient[" << i << "] = " << west_poisson_coeffecients[i] << "\n";
+    }
+
+    std::vector<double> center_poisson_coeffecients = computeCenterPoissonCoefficients(east_poisson_coeffecients, west_poisson_coeffecients);
+
+
+    for (size_t i = 0; i < N; ++i) {
+        std::cout << "Center Poisson Coeffecient[" << i << "] = " << center_poisson_coeffecients[i] << "\n";
+    }
+
+    // Positions for the charged surfaces
+    // Positions are +1, so if I want to place a suface between cell 5 and 6, the index will be 4!!!
+    int p1 = 4;
+    int p2 = 9;
+
+    std::vector<int> surface_positions = {p1,p2};
+
+    std::vector<int> sigma_mask = computeSigmaMask(surface_positions, N); 
+
+    for (size_t i = 0; i < N - 1; ++i) {
+        std::cout << "Surface[" << i << "] = " << sigma_mask[i] << "\n";
+    }
+
+    std::vector<double> sigma_coeffs = computeSigmaCoefficients(sigma_mask, permitivity, centers, edges);
+
+    for (size_t i = 0; i < N ; ++i) {
+        std::cout << "Sigma Coeff[" << i << "] = " << sigma_coeffs[i] << "\n";
+    }
+
+    return 0;
+}
+
+/*
 int main() {
     std::ifstream input_file("input.txt"); // Open the input file
     if (!input_file) {
@@ -192,6 +435,8 @@ int main() {
     std::ofstream file_current_dens("../output/current_dens.txt");
     std::ofstream file_e_field("../output/e_field.txt");
     std::ofstream file_e_energy("../output/e_energy.txt");
+    std::ofstream file_bflux("../output/bflux.txt");
+    std::ofstream file_pot("../output/pot.txt");
 
     int a = 0;
 
@@ -201,7 +446,7 @@ int main() {
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    while (simul.get_t() <= 10e-6) {
+    while (simul.get_t() <= 100e-6) {
     //while (a < 1) {    
         //if (a%1000 == 0){
         //    solver = std::make_unique<PoissonSolver2D>(fronteira_livre, sig, simul);
@@ -243,12 +488,13 @@ int main() {
             simul.write_dens(file_arplus_dens, 3);
 
             simul.write_efield(file_e_field);
+            simul.write_potential(file_pot);
 
             simul.write_e_energy(file_e_energy);
 
             file_time_steps << "Potencial on left: "<<left_potential*sin(2*3.1416*frequency * (simul.get_t())) << " dt: "<< dt << "\n";
-            file_current_dens <<  j_left << " | "<< j_right << "\n";
-
+            file_current_dens <<  sig(grid_init - 1) << " | "<< sig(grid_end - 1) << "\n";
+            file_bflux << j_left << " | " << j_right<< "\n";
             //std::cout << simul.get_Ez1()<<"\n";
             //std::cout<< j_left<<"   "<< j_right<<"\n";
         }
@@ -290,3 +536,4 @@ int main() {
     
     return 0;
 }
+*/

@@ -470,6 +470,14 @@ void Simulation::write_efield(std::ofstream& file){
     file << "----\n";  // Separator for the next matrix 
 }
 
+void Simulation::write_potential(std::ofstream& file){
+	//std::cout << std::fixed << std::setprecision(21);
+	//std::cout<<"Density writen at "<<Pot<<std::endl;
+	file << "Time: " << t << "\n";
+    file << pot << "\n";
+    file << "----\n";  // Separator for the next matrix 
+}
+
 void Simulation::write_e_energy(std::ofstream& file){
 	//std::cout << std::fixed << std::setprecision(21);
 	//std::cout<<"Density writen at "<<Pot<<std::endl;

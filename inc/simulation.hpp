@@ -33,6 +33,8 @@ class Simulation{
 
 		void write_efield(std::ofstream&);
 
+		void write_potential(std::ofstream&);
+
 		void write_e_energy(std::ofstream&);
 
 		void set_grid1D(int, double);
