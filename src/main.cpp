@@ -69,6 +69,18 @@ std::vector<double> computeCellEdges(const std::vector<double>& centers) {
     return edges;
 }
 
+std::vector<double> computeCellSizes(const std::vector<double>& edges) {
+
+    std::vector<double> cellsizes;
+    size_t N = edges.size();
+
+    for (size_t i = 0; i < N - 1; ++i) {
+        cellsizes.push_back(edges[i+1] - edges[i]);
+    }
+
+    return cellsizes;
+}
+
 std::vector<double> computeEastPoissonCoefficients(const std::vector<double>& permitivity, const std::vector<double>& centers, const std::vector<double>& edges) {
     
     // Function to calculate the East Poisson coeffecients
@@ -169,6 +181,107 @@ std::vector<double> computeSigmaCoefficients(const std::vector<int>& sigma_mask,
     return sigma_coeffs;
 }
 
+double calculate_g_c(double g_dc, double g_cu, double u, double dx, double dt){
+    
+    if (std::abs(g_dc - g_cu) < 0.6*std::abs(g_dc + g_cu)){
+        //std::cout <<"a"<<std::endl;
+        //double xmf = std::copysign(1.0, u) * (dx - std::abs(u) * dt)/2.0;
+        return g_dc - (dx*copysign(1.0,-u) + std::abs(u)*dt)/(1.5*std::copysign(1.0,u))*(g_dc - g_cu)/(2.0 *dx*copysign(1.0,u));
+        //return g_dc - 4/3*(std::copysign(1.0, u)*dx - xmf)*(g_dc - g_cu)/(2.0 *dx* std::copysign(1.0, u));
+
+    } else if (g_dc * g_cu > 0.0 ){
+        //std::cout <<"b"<<std::endl;
+        return std::copysign(1.0, g_dc)*2.0*std::min(std::abs(g_dc),std::abs(g_cu));
+    
+    }else{
+        //std::cout <<"c"<<std::endl;
+        return std::copysign(1.0, g_dc)*std::min(std::abs(g_dc),std::abs(g_cu));
+    }
+    
+    //return std::copysign(1.0, g_dc)*2*(std::abs(g_dc * g_cu)/(std::abs(g_dc) + std::abs(g_cu)+ 1e-308));
+}
+
+std::vector<double> computeFluxUNO3(const std::vector<double>& centers, const std::vector<double>& density, const std::vector<double>& e_field, const std::vector<double>& mob_coef, const std::vector<double>& dif_coef,  const int& plasma_init, const int& plasma_end, const double& dt, const int& charge){
+    std::vector<double> fluxes;
+
+    size_t N = centers.size();
+
+    for (size_t i = 0; i < N - 1; ++i) {
+
+        // Fill the flux vector for the boundaries and outside them
+        if (i < plasma_init || i >= plasma_end - 1){
+            fluxes.push_back(0);
+
+        } else {
+
+            double flux = 0;
+
+            // density derivatives respective to the donator cell (center)
+            double g_cu = 0;
+            double g_dc = 0;
+            double g_c = 0; 
+
+            double n_surface = 0; // density at the cell boundary (i | i + 1)
+
+            double v = charge * e_field[i]; // velocity in the directional sense, still needs to multiply by the mobility
+            double dx = centers[i+1] - centers[i]; // common x difference
+
+            if (v > 0 ){ // celula i -> i+1
+
+                v = v * mob_coef[i]; // true sense of velocity
+
+                g_dc = (density[i+1] - density[i])/(dx); // downstream - center cells
+
+                if (i-1 < 0){
+                    g_cu = 0; // No density difference between wall and first cell
+                } else {
+                    g_cu = (density[i] - density[i - 1])/(centers[i] - centers[i - 1]); // center - upstream cells
+                }
+                
+
+                g_c = calculate_g_c(g_dc, g_cu, v, dx, dt);
+
+                n_surface = density[i] + 0.5 * std::copysign(1.0, v) * (dx - std::abs(v) * dt) * g_c;  
+
+            } else if (v < 0) { // célula i <- i+1
+
+                v = v * mob_coef[i+1];
+
+                g_dc = -1.0 * (density[i] - density[i + 1])/(dx);
+
+                if (i > N - 3){
+
+                    g_cu = 0;
+
+                } else {
+
+                    g_cu = -1.0 *(density[i + 1] - density[i + 2])/(centers[i+2] - centers[i+1]);
+                }
+                
+
+                g_c = calculate_g_c(g_dc, g_cu, v, dx, dt);
+
+                n_surface = density[i + 1] + 0.5 * std::copysign(1.0, v) * (dx - std::abs(v) * dt) * g_c;
+
+            }
+
+            flux += v * n_surface;
+
+            double dens_div = (density[i+1] - density[i]) / (dx);
+
+            if (dens_div < 0){
+                flux -= dif_coef[i] * dens_div;
+            } else if (dens_div > 0){
+                flux -= dif_coef[i + 1] * dens_div;
+            }
+
+            fluxes.push_back(flux);
+        }
+    }   
+
+    return fluxes;
+}
+
 int main() {
 
     // Relative permitivity (For DBD case)
@@ -208,6 +321,13 @@ int main() {
     // Print the first few edges for verification
     for (size_t i = 0; i < edges.size(); ++i) {
         std::cout << "edge[" << i << "] = " << edges[i] << "\n";
+    }
+
+    std::vector<double> cellsizes = computeCellSizes(edges);
+
+    // Print the first few edges for verification
+    for (size_t i = 0; i < cellsizes.size(); ++i) {
+        std::cout << "cellsizes[" << i << "] = " << cellsizes[i] << "\n";
     }
 
     std::vector<double> permitivity(N);
@@ -264,6 +384,11 @@ int main() {
         std::cout << "Sigma Coeff[" << i << "] = " << sigma_coeffs[i] << "\n";
     }
 
+    
+
+
+
+    
     return 0;
 }
 
