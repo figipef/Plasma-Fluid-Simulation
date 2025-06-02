@@ -89,6 +89,7 @@ class Simulation{
 		void calc_time_step(double&, double, double);
 
 		double calc_net_reaction_source(const Specie&, int, int, const std::vector<Eigen::MatrixXd>);
+		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> pot; // Eletric Potential		
 	private:
 
 		// Time
@@ -152,7 +153,7 @@ class Simulation{
 
 		// Updated values 
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> rho; // Charge density
-		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> pot; // Eletric Potential
+
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> er; // Radial Eletric Field
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> ez1; // Horizontal Eletric Field on the left
 		Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> ez2; // Horizontal Eletric Field on the right

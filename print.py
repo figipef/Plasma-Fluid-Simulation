@@ -8,6 +8,7 @@ import re
 
 import scipy.constants as const
 from scipy.integrate import simps
+from scipy.interpolate import interp1d
 
 # File path
 file_path = "./chemistry/swarm.TXT"
@@ -76,6 +77,26 @@ print("InvC2 List: ", inv_C2)
 print("E/N List:", E_N_list)
 print("Mobility List:", Mobility_list)
 print("Difusion List:", Difusion_list)
+
+# Create linear interpolation function
+interp_mobility = interp1d(E_N_list[:17], Mobility_list[:17], kind='linear', fill_value='extrapolate')
+
+# Example: Generate new E/N values to evaluate the interpolation
+EN_interp = np.linspace(min(E_N_list[:17]), max(E_N_list[:17]), 500)
+mobility_interp = interp_mobility(EN_interp)
+
+# Plotting
+plt.figure(figsize=(8, 5))
+plt.plot(E_N_list[:17], Mobility_list[:17], 'o', label='Data Points')
+plt.plot(EN_interp, mobility_interp, '-', label='Linear Interpolation')
+plt.xlabel('E/N')
+plt.ylabel('Mobility')
+plt.title('Mobility vs E/N (Linear Interpolation)')
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.xscale("log")
+plt.show()
 
 def arctan(x,a,b,c,d): # For the mobility
     return a * np.arctan(np.log10(x) * b - c) + d

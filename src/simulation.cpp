@@ -594,7 +594,7 @@ double Simulation::calc_vthermal(Specie specie, double temp){
 	return sqrt(8 * 1.380649e-23 * temp / (M_PI * specie.get_mass()));
 }
 
-void Simulation::calc_e_energy(Eigen::MatrixXd& e_ener){
+void Simulation::calc_e_energy(Eigen::MatrixXd& e_ener){ 
 
 	Eigen::MatrixXd ne = species[0].get_density();
 	Eigen::MatrixXd e_ne = species.back().get_density();
