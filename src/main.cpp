@@ -531,9 +531,9 @@ int main() {
     double d3 = 4e-3;
 
     // Number of cells in sections
-    int c1 = 200;
-    int c2 = 100;
-    int c3 = 200;
+    int c1 = 20;
+    int c2 = 10;
+    int c3 = 20;
     
     std::vector<double> distances = {d1, d2, d3}; // Distances between sections SI (m)
     
@@ -700,12 +700,13 @@ int main() {
     double right_pot = 0;
 
     double t = 0.0;
-    double tmax = 50e-9;
+    double tmax = 1e-11;
     double dt = 1e-11;
 
     double tol = 1e-5;
 
-    int newton_max = 100;
+    int newton_max = 0;
+    //int newton_max = 10000;
 
     while (t < tmax) {
         // Main Loop to push sim forward
@@ -789,7 +790,7 @@ int main() {
 
             // Calculate the electric field
             Eigen::VectorXd e_field = computeEField(permitivity, centers, edges, u.segment(0,N));
-
+            std::cout <<e_field[20] <<" "<<e_field[25]<<"\n";
             std::vector<Eigen::VectorXd> species_partital_velocities;
             std::vector<Eigen::VectorXd> species_drift_fluxes;
             std::vector<Eigen::VectorXd> species_diff_fluxes;
@@ -837,16 +838,18 @@ int main() {
                     dJdiff_i, dJdiff_i1);
 
                 Eigen::VectorXd fluxes = computeFluxUNO3(drift_fluxes, diff_fluxes);
-                std::cout <<"\nfluxes "<<fluxes<<"\n";
+                std::cout <<"\nconv fluxes "<<drift_fluxes.segment(1,N-2) - drift_fluxes.segment(0,N-2)<<"\n";
+                std::cout <<"\ndiffusion fluxes "<<diff_fluxes<<"\n";
                 for(int i = grid_init + 1; i < grid_end - 1; i++){ // Calculate the values for the fluxes
                     
                     //F(s*N + i) = F(s*N + i) + (fluxes(i-1) - fluxes(i))/(edges[i] - edges[i-1]); // What is this, should be corrected...(i) - (i-1)
-                    F(s*N + i) = F(s*N + i) + (fluxes(i-1) - fluxes(i))/(edges[i] - edges[i-1]);
-
+                    F(s*N + i) = F(s*N + i) + (fluxes(i) - fluxes(i-1))/(edges[i] - edges[i-1]);
+                    //std::cout <<"flux difs "<<(fluxes(i) - fluxes(i-1))<<"\n";
+                    std::cout <<"Efield dif : "<<e_field[i+1] - e_field[i]<<"\n";
                 }
                 // Fluxes at the edges are 0
-                F(s*N + grid_init) = F(s*N + grid_init) +  fluxes(grid_init)/(edges[grid_init+1] - edges[grid_init]);
-                F(s*N + grid_end-1) = F(s*N + grid_end-1) -  fluxes(grid_end-2)/(edges[grid_end-1] - edges[grid_end-2]);
+                F(s*N + grid_init) = F(s*N + grid_init) -  fluxes(grid_init)/(edges[grid_init+1] - edges[grid_init]);
+                F(s*N + grid_end-1) = F(s*N + grid_end-1) +  fluxes(grid_end-2)/(edges[grid_end-1] - edges[grid_end-2]);
                 // STILL NEED TO ADD THE VALUES FROM CHEMISTRY
 
                 species_partital_velocities.push_back(partial_velocities);
@@ -915,7 +918,7 @@ int main() {
                     }
 
                     triplets.emplace_back(s*N + i, i, (term1 + term2 - term3 - term4)/ (edges[i+1] - edges[i]));
-                    //std::cout <<"Term1 : "<< s-1 << " " << i << " "<< term1<<" "<< term2 <<" "<<term3<<" "<<term4<<"\n";
+                    //std::cout <<"Term1 : "<< s-1 << " " << i << " "<< term1<<" "<< term2 <<" "<<term3<<" "<<term4<<" "<< (term1 + term2 - term3 - term4)/ (edges[i+1] - edges[i])<<"\n";
 
                     // Derivatives with respect to the specie density
 
@@ -927,7 +930,7 @@ int main() {
 
                     // Derivative to the right of the flux
 
-                    double dx = edges[i] - edges[i-1];
+                    double dx = edges[i+1] - edges[i];
 
 
                     if (i < N-1) {
@@ -956,6 +959,7 @@ int main() {
                             deriv_i2 = deriv_i2 + (species_dJconv_nd[s-1][i])/dx;
                             deriv_i = deriv_i + (species_dJconv_nu[s-1][i])/dx;
                         }
+                        //std::cout << deriv_i << " aaaaaa\n";
                     }
 
                     if (i > 0){
@@ -982,7 +986,7 @@ int main() {
                         }
 
                     }
-                   
+                    //std::cout << deriv_i << " bbbbbbb\n";
                     // Derivatives due to diffusion
                     if (i > 0 && i < N-1){
                         deriv_i = deriv_i + (species_dJdiff_i[s-1][i] - species_dJdiff_i1[s-1][i-1])/dx; // Remember that the derivative at J(i- 1/2) of i is with respect to i+1
@@ -990,10 +994,11 @@ int main() {
                         deriv_i_1 = deriv_i_1 - (species_dJdiff_i[s-1][i-1])/dx;
                     
                         //std::cout<<s-1<<" "<< i<<" "<<species_dJdiff_i1[s-1][i]<<"\n";
-                    
+                        //std::cout << deriv_i << " cccccc\n";
                     } else if (i == 0) {
                         deriv_i = deriv_i + species_dJdiff_i[s-1][i]/dx;
                         deriv_i1 = deriv_i1 + species_dJdiff_i1[s-1][i]/dx;
+                        //std::cout << species_dJdiff_i[s-1][i]/dx << " aaaaaAAAAAAAAAa\n";
                     } else {
                         deriv_i = deriv_i - species_dJdiff_i1[s-1][i-1]/dx;
                         deriv_i_1 = deriv_i_1 - species_dJdiff_i[s-1][i-1]/dx;
@@ -1022,8 +1027,8 @@ int main() {
             }
 
             J.setFromTriplets(triplets.begin(), triplets.end());
-            //std::cout <<J<<"\n";
-            std::cout <<"\n\n" <<F.segment(N,N) <<"\n\n\n";
+            //std::cout <<"\n J: "<<J<<"\n";
+            std::cout <<"\n\n F \n\n" <<F.segment(N,N) <<"\n\n\n";
 
             if (F.norm() < tol) {
                 std::cout << "Newton converged at iter " << k << std::endl;
@@ -1038,10 +1043,15 @@ int main() {
                 std::cerr << "F[" << i << "] = " << F(i) << " is not finite!\n";
             }
             if (solver.info() != Eigen::Success) {
+                std::cout <<"k "<<k<<std::endl;
+                std::cout <<"J: " <<J<<"\n";
+                std::cout <<"F: "<<F<<"\n";
+                std::cout <<"u"<< u.segment(N,N)<<"\n";
                 std::cerr << "Factorization failed!\n";
             }
 
             Eigen::VectorXd du = solver.solve(-F);
+            std::cout <<"\ndu\n"<< du.segment(N,N)<<"\n";
             // Solve linear system (J du = -R)
             //Eigen::VectorXd du = J.fullPivLu().solve(-F);
             u += du;
