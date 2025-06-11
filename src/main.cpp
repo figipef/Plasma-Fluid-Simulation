@@ -726,7 +726,7 @@ int main() {
 
             double dx1 = edges[1] - edges[0] ;
 
-            F(0) = east_poisson_coeffecients[0] * u(1) + center_poisson_coeffecients[0] * u(0) + west_poisson_coeffecients[0] * left_pot - charge * (u(2*N) - u(N));
+            F(0) = east_poisson_coeffecients[0] * u(1) + center_poisson_coeffecients[0] * u(0) + west_poisson_coeffecients[0] * left_pot - dx1 * charge * (u(2*N) - u(N));
 
             for (int i = 1; i < N - 1; i++){ // i = 0 or N-1 are the boundary cases
 
@@ -743,7 +743,7 @@ int main() {
 
             double dx2 = edges[N] - edges[N-1];
 
-            F(N-1) = east_poisson_coeffecients[N-1] * right_pot + center_poisson_coeffecients[N-1] * u(N-1) + west_poisson_coeffecients[N-1] * u(N-2) - charge * (u(2*N + N - 1) - u(N + N-1));
+            F(N-1) = east_poisson_coeffecients[N-1] * right_pot + center_poisson_coeffecients[N-1] * u(N-1) + west_poisson_coeffecients[N-1] * u(N-2) - dx2* charge * (u(2*N + N - 1) - u(N + N-1));
 
             //std::cout << u.segment(0,N)<<"\n";
             //std::cout<< F.segment(0,N) <<"\n";
