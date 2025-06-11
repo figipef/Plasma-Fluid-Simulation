@@ -526,14 +526,14 @@ int main() {
     double inner_rel_permitivity = 1;
 
     // Distances between sections SI (m)
-    double d1 = 4e-3;
-    double d2 = 2e-3;
-    double d3 = 4e-3;
+    double d1 = 1e-3;
+    double d2 = 1e-3;
+    double d3 = 1e-3;
 
     // Number of cells in sections
-    int c1 = 20;
-    int c2 = 10;
-    int c3 = 20;
+    int c1 = 1;
+    int c2 = 1;
+    int c3 = 1;
     
     std::vector<double> distances = {d1, d2, d3}; // Distances between sections SI (m)
     
@@ -700,12 +700,12 @@ int main() {
     double right_pot = 0;
 
     double t = 0.0;
-    double tmax = 1e-11;
+    double tmax = 50e-9;
     double dt = 1e-11;
 
-    double tol = 1e-5;
+    double tol = 1e25;
 
-    int newton_max = 0;
+    int newton_max = 100000;
     //int newton_max = 10000;
 
     while (t < tmax) {
@@ -724,11 +724,15 @@ int main() {
             // ===========================
             int surf_count = 0; // index for the surfaces
 
+            double dx1 = edges[1] - edges[0] ;
+
             F(0) = east_poisson_coeffecients[0] * u(1) + center_poisson_coeffecients[0] * u(0) + west_poisson_coeffecients[0] * left_pot - charge * (u(2*N) - u(N));
 
             for (int i = 1; i < N - 1; i++){ // i = 0 or N-1 are the boundary cases
 
-                F(i) = F(i) + east_poisson_coeffecients[i] * u(i+1) + center_poisson_coeffecients[i] * u(i) + west_poisson_coeffecients[i] * u(i-1) - charge * (u(2*N + i) - u(N+i));
+                double dx = edges[i+1] - edges[i];
+
+                F(i) = F(i) + east_poisson_coeffecients[i] * u(i+1) + center_poisson_coeffecients[i] * u(i) + west_poisson_coeffecients[i] * u(i-1) - dx * charge * (u(2*N + i) - u(N+i));
 
                 if (sigma_mask[i]){ // In the case there is a dieletric surface
                     F(i) = F(i) - sigma_coeffs[i] * u((n_species + 1) * N + surf_count);
@@ -736,6 +740,8 @@ int main() {
                     surf_count++;
                 }
             }
+
+            double dx2 = edges[N] - edges[N-1];
 
             F(N-1) = east_poisson_coeffecients[N-1] * right_pot + center_poisson_coeffecients[N-1] * u(N-1) + west_poisson_coeffecients[N-1] * u(N-2) - charge * (u(2*N + N - 1) - u(N + N-1));
 
@@ -758,8 +764,8 @@ int main() {
                 triplets.emplace_back(i,i, center_poisson_coeffecients[i]);
                 
 
-                triplets.emplace_back(i,2*N + i, -charge); // ions
-                triplets.emplace_back(i,  N + i,  charge); // electrons
+                triplets.emplace_back(i,2*N + i, -charge * (edges[i+1] - edges[i])); // ions
+                triplets.emplace_back(i,  N + i,  charge * (edges[i+1] - edges[i])); // electrons
 
                 if (i > 0) {
                     
@@ -790,7 +796,7 @@ int main() {
 
             // Calculate the electric field
             Eigen::VectorXd e_field = computeEField(permitivity, centers, edges, u.segment(0,N));
-            std::cout <<e_field[20] <<" "<<e_field[25]<<"\n";
+
             std::vector<Eigen::VectorXd> species_partital_velocities;
             std::vector<Eigen::VectorXd> species_drift_fluxes;
             std::vector<Eigen::VectorXd> species_diff_fluxes;
@@ -830,7 +836,7 @@ int main() {
                 std::vector<double> dJdiff_i1; // Diffusion flux derivative for the i+1 cell (after boundary surface)
 
                 Eigen::VectorXd partial_velocities = computeVelocity(e_field, -1); // Computes the product of electric field and charge (to know the direction of the velocity)
-  
+
                 Eigen::VectorXd drift_fluxes = computeDriftFluxUNO3(centers, u.segment(s*N,N), mob_coef, grid_init, grid_end, dt, -1, partial_velocities, values_gc,\
                     dJconv_nd, dJconv_nc, dJconv_nu);
                 
@@ -838,18 +844,21 @@ int main() {
                     dJdiff_i, dJdiff_i1);
 
                 Eigen::VectorXd fluxes = computeFluxUNO3(drift_fluxes, diff_fluxes);
-                std::cout <<"\nconv fluxes "<<drift_fluxes.segment(1,N-2) - drift_fluxes.segment(0,N-2)<<"\n";
-                std::cout <<"\ndiffusion fluxes "<<diff_fluxes<<"\n";
+                std::cout<<fluxes<<" ^FLUXES \n";
+                //std::cout <<"\nconv fluxes "<<drift_fluxes.segment(1,N-2) - drift_fluxes.segment(0,N-2)<<"\n";
+                //std::cout <<"\ndiffusion fluxes "<<diff_fluxes<<"\n";
                 for(int i = grid_init + 1; i < grid_end - 1; i++){ // Calculate the values for the fluxes
                     
                     //F(s*N + i) = F(s*N + i) + (fluxes(i-1) - fluxes(i))/(edges[i] - edges[i-1]); // What is this, should be corrected...(i) - (i-1)
                     F(s*N + i) = F(s*N + i) + (fluxes(i) - fluxes(i-1))/(edges[i] - edges[i-1]);
                     //std::cout <<"flux difs "<<(fluxes(i) - fluxes(i-1))<<"\n";
-                    std::cout <<"Efield dif : "<<e_field[i+1] - e_field[i]<<"\n";
+                    //std::cout <<"Efield dif : "<<e_field[i+1] - e_field[i]<<"\n";
+
+
                 }
                 // Fluxes at the edges are 0
-                F(s*N + grid_init) = F(s*N + grid_init) -  fluxes(grid_init)/(edges[grid_init+1] - edges[grid_init]);
-                F(s*N + grid_end-1) = F(s*N + grid_end-1) +  fluxes(grid_end-2)/(edges[grid_end-1] - edges[grid_end-2]);
+                F(s*N + grid_init) = F(s*N + grid_init) +  fluxes(grid_init)/(edges[grid_init+1] - edges[grid_init]);
+                F(s*N + grid_end-1) = F(s*N + grid_end-1) -  fluxes(grid_end-2)/(edges[grid_end-1] - edges[grid_end-2]);
                 // STILL NEED TO ADD THE VALUES FROM CHEMISTRY
 
                 species_partital_velocities.push_back(partial_velocities);
@@ -869,7 +878,7 @@ int main() {
             // ===========================
             //       For the Matrix
             // ===========================
-
+            //std::cout <<"aa"<<"\n";
             triplets.reserve(n_species* N * 6);
 
             for (int s = 1; s <= n_species; s++){
@@ -897,11 +906,11 @@ int main() {
                         term1 = species_drift_fluxes[s-1](i)/(u(i) - u(i+1) +1e-30);
 
                         if (species_partital_velocities[s-1](i) > 0 ){
-                            term2 = -0.5 * mob_coef(i) * e_field(i) * dt *species_gc_values[s - 1][i] / (edges[i+1] - edges[i]);
+                            term2 = -0.5 * mob_coef(i) * e_field(i) * dt *species_gc_values[s - 1][i];// / (edges[i+1] - edges[i]);
                         } else {
-                            term2 = -0.5 * mob_coef(i+1) * e_field(i) * dt *species_gc_values[s - 1][i] / (edges[i+1] - edges[i]);
+                            term2 = -0.5 * mob_coef(i+1) * e_field(i) * dt *species_gc_values[s - 1][i];// / (edges[i+1] - edges[i]);
                         }
-                        triplets.emplace_back(s*N + i, i+1, (- term1 - term2)/(edges[i+1] - edges[i]));
+                        triplets.emplace_back(s*N + i, i+1, -1.0*(- term1 - term2)/(edges[i+1] - edges[i]));
                     }
 
                     if (i > 0){
@@ -909,15 +918,15 @@ int main() {
                         term3 = -species_drift_fluxes[s-1](i-1)/(u(i) - u(i-1) +1e-30);
 
                         if (species_partital_velocities[s-1](i-1) > 0 ){
-                            term4 = 0.5 * mob_coef(i-1) * e_field(i-1) * dt *species_gc_values[s - 1][i-1] / (edges[i] - edges[i-1]);
+                            term4 = 0.5 * mob_coef(i-1) * e_field(i-1) * dt *species_gc_values[s - 1][i-1];// / (edges[i] - edges[i-1]);
                         } else {
-                            term4 = 0.5 * mob_coef(i) * e_field(i-1) * dt *species_gc_values[s - 1][i-1] / (edges[i] - edges[i-1]);
+                            term4 = 0.5 * mob_coef(i) * e_field(i-1) * dt *species_gc_values[s - 1][i-1];// / (edges[i] - edges[i-1]);
                         }
 
-                        triplets.emplace_back(s*N + i, i-1, (term3 + term4)/ (edges[i] - edges[i-1]));
+                        triplets.emplace_back(s*N + i, i-1, -1.0*(term3 + term4)/ (edges[i] - edges[i-1]));
                     }
 
-                    triplets.emplace_back(s*N + i, i, (term1 + term2 - term3 - term4)/ (edges[i+1] - edges[i]));
+                    triplets.emplace_back(s*N + i, i, -1.0*(term1 + term2 - term3 - term4)/ (edges[i+1] - edges[i]));
                     //std::cout <<"Term1 : "<< s-1 << " " << i << " "<< term1<<" "<< term2 <<" "<<term3<<" "<<term4<<" "<< (term1 + term2 - term3 - term4)/ (edges[i+1] - edges[i])<<"\n";
 
                     // Derivatives with respect to the specie density
@@ -1028,8 +1037,8 @@ int main() {
 
             J.setFromTriplets(triplets.begin(), triplets.end());
             //std::cout <<"\n J: "<<J<<"\n";
-            std::cout <<"\n\n F \n\n" <<F.segment(N,N) <<"\n\n\n";
-
+            std::cout <<"\n\n J \n\n" <<J <<"\n\n\n";
+            std::cout <<F.norm()<<" "<< k <<"\n";
             if (F.norm() < tol) {
                 std::cout << "Newton converged at iter " << k << std::endl;
                 break;
@@ -1051,12 +1060,11 @@ int main() {
             }
 
             Eigen::VectorXd du = solver.solve(-F);
-            std::cout <<"\ndu\n"<< du.segment(N,N)<<"\n";
+            //std::cout <<"\ndu\n"<< du.segment(N,N)<<"\n";
             // Solve linear system (J du = -R)
             //Eigen::VectorXd du = J.fullPivLu().solve(-F);
             u += du;
         }
-
         t+=dt;
         
     }
