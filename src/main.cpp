@@ -27,6 +27,13 @@ double charge = 1.6e-19;
 
 double no_epsi = 1;
 
+double conditionNumber(const Eigen::MatrixXd& A) {
+    Eigen::JacobiSVD<Eigen::MatrixXd> svd(A);
+    double cond = svd.singularValues()(0) /
+                  svd.singularValues()(svd.singularValues().size() - 1);
+    return cond;
+}
+
 std::vector<double> computeCellCenters(const std::vector<double>& distances, const std::vector<int>& cellCounts) {
     std::vector<double> centers;
 
@@ -209,25 +216,26 @@ double calculate_g_c_UNO2(double g_dc, double g_cu, double u, double dx, double 
 
 double calculate_dgc_dnd_UNO2(double xd, double xc, double xu, double g_dc, double g_cu){
     if (std::abs(g_dc) > std::abs(g_cu)){
-        return 0;
+        return 0; //in gcu conditions
     } else {
-        return std::copysign(1.0, g_dc)/std::abs(xd-xc);
+
+        return std::copysign(1.0, g_dc)/std::abs(xd-xc); //in gcd conditions
     }
 }
 
 double calculate_dgc_dnc_UNO2(double xd, double xc, double xu, double g_dc, double g_cu){
     if (std::abs(g_dc) > std::abs(g_cu)){
-        return std::copysign(1.0, g_dc)/std::abs(xc-xu);
+        return std::copysign(1.0, g_cu)/std::abs(xc-xu); //in gcu conditions
     } else {
-        return std::copysign(1.0, g_dc)/std::abs(xd-xc);
+        return std::copysign(1.0, g_dc)/std::abs(xd-xc) * (-1.0); //in gcd conditions
     }
 }
 
 double calculate_dgc_dnu_UNO2(double xd, double xc, double xu, double g_dc, double g_cu){
-    if (std::abs(g_dc) > std::abs(g_cu)){
-        return std::copysign(1.0, g_dc)/std::abs(xc-xu);
+    if (std::abs(g_dc) >= std::abs(g_cu)){
+        return std::copysign(1.0, g_cu)/std::abs(xc-xu) * (-1.0); // in gcu conditions Because of the derivatives
     } else {
-        return 0;
+        return 0; //in gcd conditions
     }
 }
 
@@ -387,6 +395,7 @@ Eigen::VectorXd computeDriftFluxUNO3(const std::vector<double>& centers, Eigen::
             double n_surface = 0; // density at the cell boundary (i | i + 1)
 
             double v = vels(i); // velocity in the directional sense, still needs to multiply by the mobility
+
             double dx = centers[i+1] - centers[i]; // common x difference
 
             if (v > 0 ){ // celula i -> i+1
@@ -415,18 +424,18 @@ Eigen::VectorXd computeDriftFluxUNO3(const std::vector<double>& centers, Eigen::
 
                 g_c = calculate_g_c_UNO2(g_dc, g_cu, v, dx , dt); // CHANGE BACK TO UNO3
 
-                n_surface = density(i) + 0.5 * std::copysign(1.0, v) * (dx - std::abs(v) * dt) * g_c;  
+                n_surface = density(i) + std::copysign(0.5, v) * (dx - std::abs(v) * dt) * g_c;  
 
                 // Calculate the derivatives for the J_convection
 
-                double coef = 0.5 * std::copysign(1.0, v) * (dx - std::abs(v) * dt);
-
-                dJdnd.push_back(v * (-coef * calculate_dgc_dnd_UNO2(xd,xc,xu,g_dc,g_cu) ));
-                dJdnc.push_back(v * (1- coef * calculate_dgc_dnc_UNO2(xd,xc,xu,g_dc,g_cu)));
-                dJdnu.push_back(v * (-coef * calculate_dgc_dnu_UNO2(xd,xc,xu,g_dc,g_cu)));
+                double coef = std::copysign(0.5, v) * (dx - std::abs(v) * dt);
+                
+                dJdnd.push_back(v * (coef * calculate_dgc_dnd_UNO2(xd,xc,xu,g_dc,g_cu) ));
+                dJdnc.push_back(v * (1 + coef * calculate_dgc_dnc_UNO2(xd,xc,xu,g_dc,g_cu)));
+                dJdnu.push_back(v * (coef * calculate_dgc_dnu_UNO2(xd,xc,xu,g_dc,g_cu)));
 
             } else if (v < 0) { // célula i <- i+1
-
+                // d := i; c := i+1; u := i+2
                 v = v * mob_coef[i+1];
 
                 double xd = centers[i];
@@ -439,7 +448,7 @@ Eigen::VectorXd computeDriftFluxUNO3(const std::vector<double>& centers, Eigen::
                     xu = centers[i+2];
                 }
 
-                g_dc = -1.0 * (density(i) - density(i + 1))/(dx);
+                g_dc = (density(i) - density(i + 1))/(-1.0 * dx);
 
                 if (i > N - 3){
 
@@ -447,21 +456,22 @@ Eigen::VectorXd computeDriftFluxUNO3(const std::vector<double>& centers, Eigen::
 
                 } else {
 
-                    g_cu = -1.0 *(density(i + 1) - density(i + 2))/(centers[i+2] - centers[i+1]);
+                    g_cu = (density(i + 1) - density(i + 2))/(centers[i+1] - centers[i+2]);
                 }
                 
 
                 g_c = calculate_g_c_UNO2(g_dc, g_cu, v, dx, dt); // CHANGE BACK TO UNO3
                 
-                n_surface = density(i + 1) + 0.5 * std::copysign(1.0, v) * (dx - std::abs(v) * dt) * g_c;
+                n_surface = density(i + 1) + std::copysign(0.5, v) * (dx - std::abs(v) * dt) * g_c; // HCHANGED
 
                 // Calculate the derivatives for the J_convection
 
-                double coef = 0.5 * std::copysign(1.0, v) * (dx - std::abs(v) * dt);
+                double coef = std::copysign(0.5,v) * (dx - std::abs(v) * dt);
 
-                dJdnd.push_back(v * (-coef * calculate_dgc_dnd_UNO2(xd,xc,xu,g_dc,g_cu) ));
-                dJdnc.push_back(v * (1- coef * calculate_dgc_dnc_UNO2(xd,xc,xu,g_dc,g_cu)));
-                dJdnu.push_back(v * (-coef * calculate_dgc_dnu_UNO2(xd,xc,xu,g_dc,g_cu)));
+                //std::cout<< i <<" aaaaaaa aasdada " << calculate_dgc_dnc_UNO2(xd,xc,xu,g_dc,g_cu)<< " " << g_dc<< " "<<g_cu<<"\n";
+                dJdnd.push_back(v * (coef * calculate_dgc_dnd_UNO2(xd,xc,xu,g_dc,g_cu) ));
+                dJdnc.push_back(v * (1 + coef * calculate_dgc_dnc_UNO2(xd,xc,xu,g_dc,g_cu)));
+                dJdnu.push_back(v * (coef * calculate_dgc_dnu_UNO2(xd,xc,xu,g_dc,g_cu)));
             }
 
             values_gc.push_back(g_c);
@@ -526,14 +536,14 @@ int main() {
     double inner_rel_permitivity = 1;
 
     // Distances between sections SI (m)
-    double d1 = 1e-3;
-    double d2 = 1e-3;
-    double d3 = 1e-3;
+    double d1 = 4e-3;
+    double d2 = 2e-3;
+    double d3 = 4e-3;
 
     // Number of cells in sections
-    int c1 = 1;
-    int c2 = 1;
-    int c3 = 1;
+    int c1 = 200;
+    int c2 = 100;
+    int c3 = 200;
     
     std::vector<double> distances = {d1, d2, d3}; // Distances between sections SI (m)
     
@@ -701,16 +711,24 @@ int main() {
 
     double t = 0.0;
     double tmax = 50e-9;
-    double dt = 1e-11;
+    double dt = 10e-12;
 
-    double tol = 1e25;
+    double tol = 1e-1;
 
     int newton_max = 100000;
     //int newton_max = 10000;
+    int counter = 0;
 
     while (t < tmax) {
+        counter +=1;
+        if (counter %1000 == 0){
+            dt = dt;
+            counter = 0;
+        }
         // Main Loop to push sim forward
         u_old = u; // Set the previous guess
+
+        double F_init = 0;
 
         for (int k = 0; k <= newton_max; k++){
             // Create the Vector and Matrix to use Newton Method
@@ -726,24 +744,24 @@ int main() {
 
             double dx1 = edges[1] - edges[0] ;
 
-            F(0) = east_poisson_coeffecients[0] * u(1) + center_poisson_coeffecients[0] * u(0) + west_poisson_coeffecients[0] * left_pot - dx1 * charge * (u(2*N) - u(N));
+            F(0) = (east_poisson_coeffecients[0] * u(1) + center_poisson_coeffecients[0] * u(0) + west_poisson_coeffecients[0] * left_pot - dx1 * charge * (u(2*N) - u(N)))/charge;
 
             for (int i = 1; i < N - 1; i++){ // i = 0 or N-1 are the boundary cases
 
                 double dx = edges[i+1] - edges[i];
 
-                F(i) = F(i) + east_poisson_coeffecients[i] * u(i+1) + center_poisson_coeffecients[i] * u(i) + west_poisson_coeffecients[i] * u(i-1) - dx * charge * (u(2*N + i) - u(N+i));
+                F(i) = F(i) + (east_poisson_coeffecients[i] * u(i+1) + center_poisson_coeffecients[i] * u(i) + west_poisson_coeffecients[i] * u(i-1) - dx * charge * (u(2*N + i) - u(N+i)))/charge;
 
                 if (sigma_mask[i]){ // In the case there is a dieletric surface
-                    F(i) = F(i) - sigma_coeffs[i] * u((n_species + 1) * N + surf_count);
-                    F(i+1) = F(i+1) - sigma_coeffs[i] * u((n_species + 1) * N + surf_count);
+                    F(i) = F(i) - (sigma_coeffs[i] * u((n_species + 1) * N + surf_count))/charge;
+                    F(i+1) = F(i+1) - (sigma_coeffs[i] * u((n_species + 1) * N + surf_count))/charge;
                     surf_count++;
                 }
             }
 
             double dx2 = edges[N] - edges[N-1];
 
-            F(N-1) = east_poisson_coeffecients[N-1] * right_pot + center_poisson_coeffecients[N-1] * u(N-1) + west_poisson_coeffecients[N-1] * u(N-2) - dx2* charge * (u(2*N + N - 1) - u(N + N-1));
+            F(N-1) = (east_poisson_coeffecients[N-1] * right_pot + center_poisson_coeffecients[N-1] * u(N-1) + west_poisson_coeffecients[N-1] * u(N-2) - dx2* charge * (u(2*N + N - 1) - u(N + N-1)))/charge;
 
             //std::cout << u.segment(0,N)<<"\n";
             //std::cout<< F.segment(0,N) <<"\n";
@@ -761,25 +779,25 @@ int main() {
                 
                 // Set the derivatives according to each variable
 
-                triplets.emplace_back(i,i, center_poisson_coeffecients[i]);
+                triplets.emplace_back(i,i, center_poisson_coeffecients[i]/charge);
                 
 
-                triplets.emplace_back(i,2*N + i, -charge * (edges[i+1] - edges[i])); // ions
-                triplets.emplace_back(i,  N + i,  charge * (edges[i+1] - edges[i])); // electrons
+                triplets.emplace_back(i,2*N + i, -charge * (edges[i+1] - edges[i])/charge); // ions
+                triplets.emplace_back(i,  N + i,  charge * (edges[i+1] - edges[i])/charge); // electrons
 
                 if (i > 0) {
                     
-                    triplets.emplace_back(i,i-1, west_poisson_coeffecients[i]);
+                    triplets.emplace_back(i,i-1, west_poisson_coeffecients[i]/charge);
                 }
 
                 if (i < N-1){
 
-                    triplets.emplace_back(i,i+1, east_poisson_coeffecients[i]);
+                    triplets.emplace_back(i,i+1, east_poisson_coeffecients[i]/charge);
 
                 }
 
                 if (sigma_mask[i] && i < N-1 ){
-                    triplets.emplace_back(i, (n_species + 1) * N + surf_count, sigma_coeffs[i]);
+                    triplets.emplace_back(i, ((n_species + 1) * N + surf_count, sigma_coeffs[i])/charge);
                 }
                 
             }
@@ -844,7 +862,7 @@ int main() {
                     dJdiff_i, dJdiff_i1);
 
                 Eigen::VectorXd fluxes = computeFluxUNO3(drift_fluxes, diff_fluxes);
-                std::cout<<fluxes<<" ^FLUXES \n";
+                //std::cout<<fluxes<<" ^FLUXES \n";
                 //std::cout <<"\nconv fluxes "<<drift_fluxes.segment(1,N-2) - drift_fluxes.segment(0,N-2)<<"\n";
                 //std::cout <<"\ndiffusion fluxes "<<diff_fluxes<<"\n";
                 for(int i = grid_init + 1; i < grid_end - 1; i++){ // Calculate the values for the fluxes
@@ -903,35 +921,40 @@ int main() {
 
                     if (i < N-1){
 
-                        term1 = species_drift_fluxes[s-1](i)/(u(i) - u(i+1) +1e-30);
+                        term1 = species_drift_fluxes[s-1](i)/(u(i) - u(i+1) +1e-308);
 
                         if (species_partital_velocities[s-1](i) > 0 ){
-                            term2 = -0.5 * mob_coef(i) * e_field(i) * dt *species_gc_values[s - 1][i];// / (edges[i+1] - edges[i]);
+                            //term2 = -0.5 * mob_coef(i) * e_field(i) * dt *species_gc_values[s - 1][i];
+                            term2 = -mob_coef(i) * e_field(i) * mob_coef(i) *dt/(edges[i+1] - edges[i]) * species_gc_values[s - 1][i] * 0.5;
                         } else {
-                            term2 = -0.5 * mob_coef(i+1) * e_field(i) * dt *species_gc_values[s - 1][i];// / (edges[i+1] - edges[i]);
+                            //term2 = -0.5 * mob_coef(i+1) * e_field(i) * dt *species_gc_values[s - 1][i];
+                            term2 = -mob_coef(i) * e_field(i) * mob_coef(i+1) *dt/(edges[i+1] - edges[i]) * species_gc_values[s - 1][i] * 0.5;
                         }
-                        triplets.emplace_back(s*N + i, i+1, -1.0*(- term1 - term2)/(edges[i+1] - edges[i]));
+
+                        triplets.emplace_back(s*N + i, i+1, (- term1 - term2)/(edges[i+1] - edges[i]));
                     }
 
                     if (i > 0){
 
-                        term3 = -species_drift_fluxes[s-1](i-1)/(u(i) - u(i-1) +1e-30);
+                        term3 = species_drift_fluxes[s-1](i-1)/(u(i-1) - u(i) +1e-308);
 
                         if (species_partital_velocities[s-1](i-1) > 0 ){
-                            term4 = 0.5 * mob_coef(i-1) * e_field(i-1) * dt *species_gc_values[s - 1][i-1];// / (edges[i] - edges[i-1]);
+                            //term4 = 0.5 * mob_coef(i-1) * e_field(i-1) * dt *species_gc_values[s - 1][i-1];
+                            term4 = mob_coef(i-1) * e_field(i-1) * mob_coef(i-1)*dt /(edges[i] - edges[i-1]) *species_gc_values[s - 1][i-1] * 0.5;
                         } else {
-                            term4 = 0.5 * mob_coef(i) * e_field(i-1) * dt *species_gc_values[s - 1][i-1];// / (edges[i] - edges[i-1]);
+                            //term4 = 0.5 * mob_coef(i) * e_field(i-1) * dt *species_gc_values[s - 1][i-1];
+                            term4 = mob_coef(i-1) * e_field(i-1) * mob_coef(i)*dt /(edges[i] - edges[i-1]) *species_gc_values[s - 1][i-1] * 0.5;
                         }
 
-                        triplets.emplace_back(s*N + i, i-1, -1.0*(term3 + term4)/ (edges[i] - edges[i-1]));
+                        triplets.emplace_back(s*N + i, i-1, (term3 + term4)/ (edges[i] - edges[i-1]));
                     }
 
-                    triplets.emplace_back(s*N + i, i, -1.0*(term1 + term2 - term3 - term4)/ (edges[i+1] - edges[i]));
+                    triplets.emplace_back(s*N + i, i, (term1 + term2 - term3 - term4)/ (edges[i+1] - edges[i]));
                     //std::cout <<"Term1 : "<< s-1 << " " << i << " "<< term1<<" "<< term2 <<" "<<term3<<" "<<term4<<" "<< (term1 + term2 - term3 - term4)/ (edges[i+1] - edges[i])<<"\n";
 
                     // Derivatives with respect to the specie density
 
-                    double deriv_i = 1/dt; // derivative with respect to ni
+                    double deriv_i = 1/dt;///dt; // derivative with respect to ni
                     double deriv_i1 = 0; //   derivative with respect to ni + 1
                     double deriv_i2 = 0; //   derivative with respect to ni + 2
                     double deriv_i_1 = 0;//   derivative with respect to ni - 1
@@ -941,6 +964,7 @@ int main() {
 
                     double dx = edges[i+1] - edges[i];
 
+                    // For the right boundary of the cell (x_i+1/2)
 
                     if (i < N-1) {
 
@@ -951,33 +975,31 @@ int main() {
 
                         if (species_partital_velocities[s-1](i) > 0){
 
-                            int d = i+1;
-                            int c = i;
-                            int u = i-1;
+                            // d = i+1; c = i; u = i-1;
 
                             deriv_i = deriv_i + (species_dJconv_nc[s-1][i])/dx;
                             deriv_i1 = deriv_i1 + (species_dJconv_nd[s-1][i])/dx;
                             deriv_i_1 = deriv_i_1 + (species_dJconv_nu[s-1][i])/dx;
 
                         } else {
-                            int d = i+2;
-                            int c = i+1;
-                            int u = i;
+
+                            // d = i; c = i+1; u = i+2;
 
                             deriv_i1 = deriv_i1 + (species_dJconv_nc[s-1][i])/dx;
-                            deriv_i2 = deriv_i2 + (species_dJconv_nd[s-1][i])/dx;
-                            deriv_i = deriv_i + (species_dJconv_nu[s-1][i])/dx;
+                            deriv_i = deriv_i + (species_dJconv_nd[s-1][i])/dx;
+                            deriv_i2 = deriv_i2 + (species_dJconv_nu[s-1][i])/dx;
+
                         }
                         //std::cout << deriv_i << " aaaaaa\n";
                     }
+
+                    // For the left boundary of the cell (x_i-1/2)
 
                     if (i > 0){
 
                         if (species_partital_velocities[s-1](i-1) > 0){
 
-                            int d = i;
-                            int c = i-1;
-                            int u = i-2;
+                            // d = i; c = i-1; u = i-2;
 
                             deriv_i_1 = deriv_i_1 - (species_dJconv_nc[s-1][i-1])/dx;
                             deriv_i = deriv_i - (species_dJconv_nd[s-1][i-1])/dx;
@@ -985,9 +1007,7 @@ int main() {
 
                         } else {
 
-                            int d = i-1;
-                            int c = i;
-                            int u = i+1;
+                            // d = i-1; c = i; u = i+1;
 
                             deriv_i = deriv_i - (species_dJconv_nc[s-1][i-1])/dx;
                             deriv_i_1 = deriv_i_1 - (species_dJconv_nd[s-1][i-1])/dx;
@@ -1037,10 +1057,14 @@ int main() {
 
             J.setFromTriplets(triplets.begin(), triplets.end());
             //std::cout <<"\n J: "<<J<<"\n";
-            std::cout <<"\n\n J \n\n" <<J <<"\n\n\n";
-            std::cout <<F.norm()<<" "<< k <<"\n";
-            if (F.norm() < tol) {
-                std::cout << "Newton converged at iter " << k << std::endl;
+            //std::cout <<"\n\n J \n\n" <<J <<"\n\n\n";
+            
+            if (k == 0){
+                F_init = F.norm();
+            }
+            std::cout <<F.norm()<<" "<<F.norm()/F_init<<" "<< k <<"\n";
+            if (F.norm()/F_init < tol) {
+                std::cout << "Newton converged at iter " << k  <<" condition number \n"<<"\n" << std::endl ;
                 break;
             }
 
@@ -1052,11 +1076,11 @@ int main() {
                 std::cerr << "F[" << i << "] = " << F(i) << " is not finite!\n";
             }
             if (solver.info() != Eigen::Success) {
-                std::cout <<"k "<<k<<std::endl;
-                std::cout <<"J: " <<J<<"\n";
+                std::cout <<"k "<<k<<" "<<t<<std::endl;
+                //std::cout <<"J: " <<J<<"\n";
                 std::cout <<"F: "<<F<<"\n";
-                std::cout <<"u"<< u.segment(N,N)<<"\n";
-                std::cerr << "Factorization failed!\n";
+                //std::cout <<"u"<< u.segment(N,N)<<"\n";
+                std::cerr << "Factorization failed!\n" <<  " condition number " << conditionNumber(J)<<"\n";
             }
 
             Eigen::VectorXd du = solver.solve(-F);
@@ -1068,7 +1092,7 @@ int main() {
         t+=dt;
         
     }
-    std::cout << "Sol: at t "<< t<<" " << u.segment(N,N) <<"\n";
+    std::cout << "Sol: at t "<< t<<"\n " << u.segment(N,N) <<"\n";
     return 0;
 }
 
