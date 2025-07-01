@@ -210,7 +210,7 @@ double calculate_g_c(double g_dc, double g_cu, double u, double dx, double dt){
     //return std::copysign(1.0, g_dc)*2*(std::abs(g_dc * g_cu)/(std::abs(g_dc) + std::abs(g_cu)+ 1e-308));
 }
 
-double calculate_g_c_UNO2(double g_dc, double g_cu, double u, double dx, double dt){
+double calculate_g_c_UNO2(double g_dc, double g_cu, double y, double dx, double dt){
     return std::copysign(1.0, g_dc)*std::min(std::abs(g_dc),std::abs(g_cu));
 }
 
@@ -219,21 +219,21 @@ double calculate_dgc_dnd_UNO2(double xd, double xc, double xu, double g_dc, doub
         return 0; //in gcu conditions
     } else {
 
-        return std::copysign(1.0, g_dc)/std::abs(xd-xc); //in gcd conditions
+        return 1/(xd-xc); //in gcd conditions
     }
 }
 
 double calculate_dgc_dnc_UNO2(double xd, double xc, double xu, double g_dc, double g_cu){
     if (std::abs(g_dc) > std::abs(g_cu)){
-        return std::copysign(1.0, g_cu)/std::abs(xc-xu); //in gcu conditions
+        return std::copysign(1.0, g_dc)* std::copysign(1.0, g_cu)/(xc-xu); //in gcu conditions
     } else {
-        return std::copysign(1.0, g_dc)/std::abs(xd-xc) * (-1.0); //in gcd conditions
+        return 1/(xd-xc) * (-1.0); //in gdc conditions
     }
 }
 
 double calculate_dgc_dnu_UNO2(double xd, double xc, double xu, double g_dc, double g_cu){
     if (std::abs(g_dc) >= std::abs(g_cu)){
-        return std::copysign(1.0, g_cu)/std::abs(xc-xu) * (-1.0); // in gcu conditions Because of the derivatives
+        return std::copysign(1.0, g_dc)*std::copysign(1.0, g_cu)/(xc-xu) * (-1.0); // in gcu conditions Because of the derivatives
     } else {
         return 0; //in gcd conditions
     }
@@ -421,7 +421,6 @@ Eigen::VectorXd computeDriftFluxUNO3(const std::vector<double>& centers, Eigen::
                     g_cu = (density(i) - density(i - 1))/(centers[i] - centers[i - 1]); // center - upstream cells
                 }
                 
-
                 g_c = calculate_g_c_UNO2(g_dc, g_cu, v, dx , dt); // CHANGE BACK TO UNO3
 
                 n_surface = density(i) + std::copysign(0.5, v) * (dx - std::abs(v) * dt) * g_c;  
@@ -459,7 +458,6 @@ Eigen::VectorXd computeDriftFluxUNO3(const std::vector<double>& centers, Eigen::
                     g_cu = (density(i + 1) - density(i + 2))/(centers[i+1] - centers[i+2]);
                 }
                 
-
                 g_c = calculate_g_c_UNO2(g_dc, g_cu, v, dx, dt); // CHANGE BACK TO UNO3
                 
                 n_surface = density(i + 1) + std::copysign(0.5, v) * (dx - std::abs(v) * dt) * g_c; // HCHANGED
@@ -541,9 +539,9 @@ int main() {
     double d3 = 4e-3;
 
     // Number of cells in sections
-    int c1 = 200;
-    int c2 = 100;
-    int c3 = 200;
+    int c1 = 4;
+    int c2 = 2;
+    int c3 = 4;
     
     std::vector<double> distances = {d1, d2, d3}; // Distances between sections SI (m)
     
@@ -710,12 +708,12 @@ int main() {
     double right_pot = 0;
 
     double t = 0.0;
-    double tmax = 50e-9;
+    double tmax = 10e-12;
     double dt = 10e-12;
 
     double tol = 1e-1;
 
-    int newton_max = 100000;
+    int newton_max = 0;
     //int newton_max = 10000;
     int counter = 0;
 
@@ -862,16 +860,10 @@ int main() {
                     dJdiff_i, dJdiff_i1);
 
                 Eigen::VectorXd fluxes = computeFluxUNO3(drift_fluxes, diff_fluxes);
-                //std::cout<<fluxes<<" ^FLUXES \n";
-                //std::cout <<"\nconv fluxes "<<drift_fluxes.segment(1,N-2) - drift_fluxes.segment(0,N-2)<<"\n";
-                //std::cout <<"\ndiffusion fluxes "<<diff_fluxes<<"\n";
+
                 for(int i = grid_init + 1; i < grid_end - 1; i++){ // Calculate the values for the fluxes
                     
-                    //F(s*N + i) = F(s*N + i) + (fluxes(i-1) - fluxes(i))/(edges[i] - edges[i-1]); // What is this, should be corrected...(i) - (i-1)
                     F(s*N + i) = F(s*N + i) + (fluxes(i) - fluxes(i-1))/(edges[i] - edges[i-1]);
-                    //std::cout <<"flux difs "<<(fluxes(i) - fluxes(i-1))<<"\n";
-                    //std::cout <<"Efield dif : "<<e_field[i+1] - e_field[i]<<"\n";
-
 
                 }
                 // Fluxes at the edges are 0
@@ -892,6 +884,84 @@ int main() {
                 species_dJdiff_i1.push_back(dJdiff_i1); 
                 
             }
+            // ===============================
+            // ===============================
+            // ===============================
+            // === DEBUG PURPOSES ===
+            // ===============================
+            // ===============================
+            // ===============================
+            // ===============================
+            
+            Eigen::VectorXd u_DEBUG1 = Eigen::VectorXd::Constant(total_size, 0); // Old values for each iteration
+            Eigen::VectorXd u_DEBUG2 = Eigen::VectorXd::Constant(total_size, 0); // Old values for each iteration
+            u_DEBUG1 = u; // Guess values for each iteration
+            u_DEBUG2 = u; // Guess values for each iteration
+            int nim = 3;
+            double eps = 1e14;
+            //std::cout <<"aaaa wayriua "  <<u_DEBUG1(N)<<"\n";
+
+            u_DEBUG1(1*N + nim) = u_DEBUG1(1*N + nim) + eps;
+            u_DEBUG2(1*N + nim) = u_DEBUG2(1*N + nim) - eps;
+
+            Eigen::VectorXd F_DEBUG1 = Eigen::VectorXd::Constant(u.size(), 0);
+            Eigen::VectorXd F_DEBUG2 = Eigen::VectorXd::Constant(u.size(), 0);
+
+            for(int i = grid_init; i < grid_end; i++){ 
+                F_DEBUG1(N + i) = (u_DEBUG1(N + i) - u_old(N + i))/dt; // Backwards time derivative for all points in the grid
+                F_DEBUG2(N + i) = (u_DEBUG2(N + i) - u_old(N + i))/dt; // Backwards time derivative for all points in the grid
+
+            }
+
+            mob_coef = Eigen::VectorXd::Constant(N, 0.03);
+            dif_coef = Eigen::VectorXd::Constant(N, 0.1);
+
+            // Calculate the fluxes
+            std::vector<double> values_gc;
+            std::vector<double> dJconv_nd; // Convection flux derivarive for the downstream cell
+            std::vector<double> dJconv_nc; // Convection flux derivarive for the center cell
+            std::vector<double> dJconv_nu; // Convection flux derivarive for the upstream cell
+            std::vector<double> dJdiff_i;  // Diffusion flux derivative for the i cell (before boundary surface)
+            std::vector<double> dJdiff_i1; // Diffusion flux derivative for the i+1 cell (after boundary surface)
+
+            Eigen::VectorXd partial_velocities = computeVelocity(e_field, -1); // Computes the product of electric field and charge (to know the direction of the velocity)
+            int s = 1;
+            Eigen::VectorXd drift_fluxes_DEBUG1 = computeDriftFluxUNO3(centers, u_DEBUG1.segment(s*N,N), mob_coef, grid_init, grid_end, dt, -1, partial_velocities, values_gc,\
+                dJconv_nd, dJconv_nc, dJconv_nu);
+                
+            Eigen::VectorXd drift_fluxes_DEBUG2 = computeDriftFluxUNO3(centers, u_DEBUG2.segment(s*N,N), mob_coef, grid_init, grid_end, dt, -1, partial_velocities, values_gc,\
+                dJconv_nd, dJconv_nc, dJconv_nu);
+
+            Eigen::VectorXd diff_fluxes_DEBUG1 = computeDiffFluxUNO3(centers, u_DEBUG1.segment(s*N,N), dif_coef, grid_init, grid_end,\
+                dJdiff_i, dJdiff_i1);
+
+            Eigen::VectorXd diff_fluxes_DEBUG2 = computeDiffFluxUNO3(centers, u_DEBUG2.segment(s*N,N), dif_coef, grid_init, grid_end,\
+                dJdiff_i, dJdiff_i1);
+
+            Eigen::VectorXd fluxes_DEBUG1 = computeFluxUNO3(drift_fluxes_DEBUG1, diff_fluxes_DEBUG1);
+            Eigen::VectorXd fluxes_DEBUG2 = computeFluxUNO3(drift_fluxes_DEBUG2, diff_fluxes_DEBUG2);
+
+            for(int i = grid_init + 1; i < grid_end - 1; i++){ // Calculate the values for the fluxes
+                    
+                F_DEBUG1(s*N + i) = F_DEBUG1(s*N + i) + (fluxes_DEBUG1(i) - fluxes_DEBUG1(i-1))/(edges[i] - edges[i-1]);
+                F_DEBUG2(s*N + i) = F_DEBUG2(s*N + i) + (fluxes_DEBUG2(i) - fluxes_DEBUG2(i-1))/(edges[i] - edges[i-1]);
+
+            }
+            // Fluxes at the edges are 0
+            F_DEBUG1(s*N + grid_init) = F_DEBUG1(s*N + grid_init) +  fluxes_DEBUG1(grid_init)/(edges[grid_init+1] - edges[grid_init]);
+            F_DEBUG1(s*N + grid_end-1) = F_DEBUG1(s*N + grid_end-1) -  fluxes_DEBUG1(grid_end-2)/(edges[grid_end-1] - edges[grid_end-2]);
+
+            F_DEBUG2(s*N + grid_init) = F_DEBUG2(s*N + grid_init) +  fluxes_DEBUG2(grid_init)/(edges[grid_init+1] - edges[grid_init]);
+            F_DEBUG2(s*N + grid_end-1) = F_DEBUG2(s*N + grid_end-1) -  fluxes_DEBUG2(grid_end-2)/(edges[grid_end-1] - edges[grid_end-2]);
+            // STILL NEED TO ADD THE VALUES FROM CHEMISTRY  
+
+            std::cout << "derivad "<< (F_DEBUG1 - F_DEBUG2)/(2*eps) <<"\n";
+            
+            // ========================================================
+            // ========================================================
+            // ========================================================
+            // ========================================================
+            // ========================================================
 
             // ===========================
             //       For the Matrix
@@ -977,16 +1047,16 @@ int main() {
 
                             // d = i+1; c = i; u = i-1;
 
-                            deriv_i = deriv_i + (species_dJconv_nc[s-1][i])/dx;
                             deriv_i1 = deriv_i1 + (species_dJconv_nd[s-1][i])/dx;
+                            deriv_i = deriv_i + (species_dJconv_nc[s-1][i])/dx;
                             deriv_i_1 = deriv_i_1 + (species_dJconv_nu[s-1][i])/dx;
 
                         } else {
 
                             // d = i; c = i+1; u = i+2;
 
-                            deriv_i1 = deriv_i1 + (species_dJconv_nc[s-1][i])/dx;
                             deriv_i = deriv_i + (species_dJconv_nd[s-1][i])/dx;
+                            deriv_i1 = deriv_i1 + (species_dJconv_nc[s-1][i])/dx;
                             deriv_i2 = deriv_i2 + (species_dJconv_nu[s-1][i])/dx;
 
                         }
@@ -1001,16 +1071,16 @@ int main() {
 
                             // d = i; c = i-1; u = i-2;
 
-                            deriv_i_1 = deriv_i_1 - (species_dJconv_nc[s-1][i-1])/dx;
                             deriv_i = deriv_i - (species_dJconv_nd[s-1][i-1])/dx;
+                            deriv_i_1 = deriv_i_1 - (species_dJconv_nc[s-1][i-1])/dx;
                             deriv_i_2 = deriv_i_2 - (species_dJconv_nu[s-1][i-1])/dx;
 
                         } else {
 
                             // d = i-1; c = i; u = i+1;
 
-                            deriv_i = deriv_i - (species_dJconv_nc[s-1][i-1])/dx;
                             deriv_i_1 = deriv_i_1 - (species_dJconv_nd[s-1][i-1])/dx;
+                            deriv_i = deriv_i - (species_dJconv_nc[s-1][i-1])/dx;
                             deriv_i1 = deriv_i1 - (species_dJconv_nu[s-1][i-1])/dx;
                         }
 
@@ -1057,6 +1127,7 @@ int main() {
 
             J.setFromTriplets(triplets.begin(), triplets.end());
             //std::cout <<"\n J: "<<J<<"\n";
+            std::cout <<"\n\n J \n\n" <<J.col(N+nim) <<"\n\n\n";
             //std::cout <<"\n\n J \n\n" <<J <<"\n\n\n";
             
             if (k == 0){
